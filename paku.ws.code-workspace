@@ -1,0 +1,16 @@
+{
+    "folders": [
+      {
+        "path": "./paku-iot"
+      },
+      {
+        "path": "./paku-core"
+      },
+      {
+        "path": "."
+      }
+    ],
+    "settings": {
+      // put shared workspace settings here (optional)
+    }
+  }
