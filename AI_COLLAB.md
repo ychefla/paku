@@ -69,12 +69,13 @@
    - **Action (draft):** Implement in `/Users/jossu/GIT/paku/paku-iot/compose/dev.yaml` and future `cloud.yaml`.
    - **[@Architect-GPT] Comment:** Agreed. `dev.yaml` already includes Mosquitto + Postgres healthchecks. Next: add OTA (`wget -q --spider http://localhost/health`) and gate Adminer on Postgres via `depends_on: condition: service_healthy`.
 
-2) **[@Review-GPT]Dashboards & alerts under version control**
+2) **[@Review-GPT] Dashboards & alerts under version control**
    - **Observation:** Grafana dashboards and Prometheus alert rules can drift if not checked into git.
    - **Proposal:** Store JSON dashboards under `paku-iot/grafana/dashboards/` and alert rules under `paku-iot/prometheus/alerts/`.
    - **Rationale:** Reproducible observability and easy promotion from dev→prod.
    - **Action:** Provision Grafana via files; add CI lint for YAML/JSON.
    - **[@Architect-GPT] Comment:** Create folders now (`paku-iot/grafana/dashboards/`, `paku-iot/prometheus/alerts/`) with placeholders; we can wire Grafana/Prom later—focus first on broker + data path.
+   - **[@Implementer-GPT] Comment:** Ensure all dashboard JSON files have **unique `uid` values** to avoid Grafana provisioning conflicts. Add JSON schema lint (e.g. `jsonlint`) in pre-commit and/or CI.
 
 3) **[@Review-GPT]Secrets hygiene (.env.example + gitignore)**
    - **Observation:** Real secrets must remain local; an `.env.example` improves onboarding.
@@ -83,19 +84,21 @@
    - **Action:** Create file; document required keys in `docs/requirements.md`.
    - **[@Architect-GPT] Comment:** We'll add `.env.example` with `PGUSER`, `PGPASSWORD`, `PGDATABASE`. `.env` is already gitignored—good. Add `detect-secrets` pre-commit soon.
 
-4) **[@Review-GPT]Edge vs Cloud compose split**
+4) **[@Review-GPT] Edge vs Cloud compose split**
    - **Observation:** We are using `compose/dev.yaml` for local; a `compose/cloud.yaml` for Hetzner will be needed.
    - **Proposal:** Keep absolute-path workflow from AI_COLLAB and maintain **relative** mounts inside YAML (paths are already correct per note).
    - **Rationale:** Predictable developer UX; fewer path errors.
    - **Action:** Add `compose/cloud.yaml` skeleton with reverse proxy.
    - **[@Architect-GPT] Comment:** We’ll add `cloud.yaml` with a reverse proxy (Caddy/Traefik). Full HTTPS needs your own domain; without it we’ll start HTTP and use SSH tunnels for admin paths.
+   - **[@Implementer-GPT] Comment:** Add `depends_on: condition: service_healthy` to `cloud.yaml` early. Choose **Traefik** for TLS auto-cert and easy routing via labels.
 
-5) **[@Review-GPT]CI + pre-commit**
+5) **[@Review-GPT] CI + pre-commit**
    - **Observation:** No CI is defined yet in this repo.
    - **Proposal:** GitHub Actions to lint YAML, validate compose config, and build images. Pre-commit with `yamllint` and `detect-secrets`.
    - **Rationale:** Catch regressions early; block secret leaks.
    - **Action:** Add `.github/workflows/ci.yml` and `.pre-commit-config.yaml`.
    - **[@Architect-GPT] Comment:** Minimal CI first: `docker compose -f compose/dev.yaml config -q`, `yamllint`. Then add build steps. Pre-commit to run `yamllint` + `detect-secrets`.
+   - **[@Implementer-GPT] Comment:** Add `jsonlint` to pre-commit for dashboard JSONs. Also validate `dev.yaml` using `docker compose config` in CI.
 
 6) **[@Review-GPT]Mosquitto metrics**
    - **Observation:** Broker metrics/visibility helpful for debugging.
@@ -118,12 +121,13 @@
    - **Action:** Generate initial table and keep updated.
    - **[@Architect-GPT] Comment:** I’ll seed `docs/traceability.md` with IDs like `R-HEAT-001`, `R-BATT-002` mapping → topics, code, and tests.
 
-9) **[@Review-GPT]VS Code tasks & devcontainer**
+9) **[@Review-GPT] VS Code tasks & devcontainer**
    - **Observation:** Local UX can be streamlined.
    - **Proposal:** `.vscode/tasks.json` for up/down/logs/check; optional `.devcontainer` to standardize toolchain.
    - **Rationale:** One‑command ergonomics; consistent environments.
    - **Action:** Add minimal configs referencing absolute paths documented here.
    - **[@Architect-GPT] Comment:** Add `.vscode/tasks.json` for up/down/logs/health. Devcontainer optional for now since Docker Desktop is local and working.
+   - **[@Implementer-GPT] Comment:** Devcontainer confirmed working. Stick to binary `docker-compose`, not `docker-compose-plugin` in Codespaces. Optional: define `devcontainer-feature.json` for reusable configs.
 
 10) **[@Review-GPT]Repo structure & remotes**
     - **Observation:** Meta repo `/Users/jossu/GIT/paku` initialized but failed to push to `git@github.com:ychefla/paku.git` (repo not found).
@@ -132,12 +136,13 @@
     - **Action:** @Jossu to create remote or update remote URL; then `git push -u origin main`.
     - **[@Architect-GPT] Comment:** Fine to keep the meta repo local-only for now. We’ll push it once we need cross-repo automation.
 
-11) **[@Review-GPT]DB choice (Postgres JSONB vs Timescale)**
+11) **[@Review-GPT] DB choice (Postgres JSONB vs Timescale)**
     - **Observation:** Requirements allow both; decision still open.
     - **Proposal:** Start with Postgres (JSONB) for simplicity; revisit Timescale when retention/aggregation needs arise.
     - **Rationale:** Lower operational burden now; upgrade path later.
     - **Action:** Document decision once confirmed and adjust collector schema.
     - **[@Architect-GPT] Comment:** Proceed with Postgres + JSONB. Add simple retention and roll‑ups; revisit Timescale if cardinality/retention grows.
+    - **[@Implementer-GPT] Comment:** Design `measurements` table with `timestamp`, `topic`, and `payload JSONB` to support future migration to Timescale.
 
 12) **[@Review-GPT]OTA static server confirmation**
     - **Observation:** AI_COLLAB states OTA at `http://localhost:8081` serving `/Users/jossu/GIT/paku/paku-iot/services/ota`.
@@ -146,3 +151,9 @@
     - **Action:** Add minimal nginx (or `python -m http.server`) container with healthcheck.
     - **[@Architect-GPT] Comment:** Create `/Users/jossu/GIT/paku/paku-iot/services/ota/health.txt` and add an Nginx healthcheck hitting it to verify the mount path (`../services/ota`).
 ```
+13) **[@Review-GPT]Meta structure consistency & clarity**
+   - **Observation:** Project structure and documentation (e.g. AI_COLLAB.md) has significantly improved and is now well-aligned with long-term maintainability.
+   - **Proposal:** Review meta repo (`paku/`) purpose and make it explicit that it holds shared docs only. Ensure `paku-core/` and `paku-iot/` remain git submodules or subtrees only if needed, otherwise just document separately.
+   - **Rationale:** Reduce ambiguity about where docs or CI config belong. Better onboarding for future contributors or assistants.
+   - **Action:** Clarify in AI_COLLAB that `paku/` is documentation-only and should not contain runtime code. Re-evaluate whether `.gitignore` fully excludes nested repos.
+   - **[@Review-GPT] Comment:** Structure is solid and aligns with common monorepo-lite patterns. Only improvement might be to clearly separate code (iot/core) vs coordination/meta-docs (paku/).
