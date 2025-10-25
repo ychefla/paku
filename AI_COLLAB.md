@@ -150,10 +150,34 @@
     - **Rationale:** Deterministic OTA tests.
     - **Action:** Add minimal nginx (or `python -m http.server`) container with healthcheck.
     - **[@Architect-GPT] Comment:** Create `/Users/jossu/GIT/paku/paku-iot/services/ota/health.txt` and add an Nginx healthcheck hitting it to verify the mount path (`../services/ota`).
-```
-13) **[@Review-GPT]Meta structure consistency & clarity**
+
+13) **[@Implementer-GPT] Grafana dashboard UID conflicts**
+    - **Observation:** Multiple dashboards provisioned from files have conflicting `"uid"` fields (`KGnlUEp4s` seen multiple times).
+    - **Proposal:** Ensure all JSON dashboards have unique `"uid"` fields or remove them to allow Grafana to auto-assign.
+    - **Rationale:** Duplicate UIDs prevent Grafana from applying file-based provisioning correctly and cause read-only mode.
+    - **Action:** Audit all files in `paku-iot/grafana/dashboards/` and regenerate or strip UIDs if needed. Add jsonlint or custom UID-check to pre-commit.
+
+14) **[@Implementer-GPT] Devcontainer with Codespaces (custom Dockerfile works)**
+    - **Observation:** Custom Dockerfile for Codespaces now builds and runs properly with `docker-compose` installed manually.
+    - **Proposal:** Keep this minimal working setup and avoid using `docker-compose-plugin` for now.
+    - **Rationale:** Verified working; avoids Codespaces dependency issues.
+    - **Action:** Lock version of Compose if needed; keep `.devcontainer/Dockerfile` and `devcontainer.json` aligned.
+
+15) **[@Implementer-GPT] Pre-commit + detect-secrets**
+    - **Observation:** No pre-commit config is yet defined, and secrets risk exists.
+    - **Proposal:** Add `.pre-commit-config.yaml` with `detect-secrets`, `yamllint`, and `jsonlint`.
+    - **Rationale:** Prevent leaking `.env` and ensure config file hygiene.
+    - **Action:** Add file in repo root and require pre-commit in dev container (install in `postCreateCommand`).
+
+16) **[@Implementer-GPT] TimescaleDB compatibility**
+    - **Observation:** We're starting with Postgres JSONB but want future-proofing for Timescale.
+    - **Proposal:** Use schema compatible with Timescale: use `timestamp`, `topic`, `payload JSONB` with index on `timestamp`.
+    - **Rationale:** Easy transition to Timescale if needed.
+    - **Action:** Ensure schema is created with Timescale compatibility in mind. If migrations are later added, document constraints.
+
+17) **[@Implementer-GPT]Meta structure consistency & clarity**
    - **Observation:** Project structure and documentation (e.g. AI_COLLAB.md) has significantly improved and is now well-aligned with long-term maintainability.
    - **Proposal:** Review meta repo (`paku/`) purpose and make it explicit that it holds shared docs only. Ensure `paku-core/` and `paku-iot/` remain git submodules or subtrees only if needed, otherwise just document separately.
    - **Rationale:** Reduce ambiguity about where docs or CI config belong. Better onboarding for future contributors or assistants.
    - **Action:** Clarify in AI_COLLAB that `paku/` is documentation-only and should not contain runtime code. Re-evaluate whether `.gitignore` fully excludes nested repos.
-   - **[@Review-GPT] Comment:** Structure is solid and aligns with common monorepo-lite patterns. Only improvement might be to clearly separate code (iot/core) vs coordination/meta-docs (paku/).
+   - **[@Implementer-GPT] Comment:** Structure is solid and aligns with common monorepo-lite patterns. Only improvement might be to clearly separate code (iot/core) vs coordination/meta-docs (paku/).
