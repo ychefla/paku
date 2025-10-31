@@ -1,35 +1,248 @@
 # AI_COLLAB – Shared context for assistants
 
-## What this project contains
-- **paku-iot** = host side (Docker stack: Mosquitto, Postgres, Adminer, OTA static server). GIT in https://github.com/ychefla/paku-iot
-- **paku-core** = ESP32 firmware (a.k.a. “EDGE/CORE” device code). GIT in https://github.com/ychefla/paku-core
-- **paku** = Common documentation for the project (parent folder of paku-iot and paku-core). GIT in https://github.com/ychefla/paku
+## Prerequisites
+To ensure the project works correctly, all repositories must be cloned into the same parent directory. The expected structure is as follows:
 
-## Canonical paths & commands (Mac)
-- **Project root:** `/Users/jossu/GIT/paku`
-- **Host repo:** `/Users/jossu/GIT/paku/paku-iot`
-- **Firmware repo:** `/Users/jossu/GIT/paku/paku-core`
-- **Compose dir:** `/Users/jossu/GIT/paku/paku-iot/compose`
 
-- Bring up dev stack:
+## MQTT Broker Configuration
+
+## TODO: Secure the MQTT Broker for Production
+- **Task**: Add authentication and TLS encryption to the Mosquitto broker in production.
+- **Steps**:
+  1. Generate or obtain the following files:
+     - `passwords`: Use the `mosquitto_passwd` command to create a password file.
+     - `ca.crt`, `server.crt`, `server.key`: Obtain or generate TLS certificates for encrypting communication.
+  2. Update the `prod.yaml` file to include the following volumes:
+     ```yaml
+     volumes:
+       - ./mosquitto/config/passwords:/mosquitto/config/passwords
+       - ./mosquitto/config/ca.crt:/mosquitto/config/ca.crt
+       - ./mosquitto/config/server.crt:/mosquitto/config/server.crt
+       - ./mosquitto/config/server.key:/mosquitto/config/server.key
+     ```
+  3. Update the `mosquitto.prod.conf` file to enable authentication and TLS:
+     ```conf
+     allow_anonymous false
+     password_file /mosquitto/config/passwords
+     listener 8883
+     cafile /mosquitto/config/ca.crt
+     certfile /mosquitto/config/server.crt
+     keyfile /mosquitto/config/server.key
+     ```
+  4. Test the configuration in a staging environment before deploying to production.
+
+### Development Configuration
+- **File**: `$PROJECT_ROOT/paku-iot/compose/mosquitto/mosquitto.conf`
+- **Purpose**: Configures the Mosquitto MQTT broker for development purposes.
+- **Example Configuration**:
+  ```conf
+  # Listen on port 1883 for MQTT connections
+  listener 1883
+  allow_anonymous true
+
+  # Persistence settings
+  persistence true
+  persistence_location /mosquitto/data/
+
+  # Log settings
+  log_dest stdout
+  ```
+- **Notes**:
+  - The above configuration allows anonymous connections, which is acceptable for local development but **must not** be used in production.
+  - The persistence settings ensure that messages are retained across broker restarts.
+
+### Production Configuration
+- **File**: `$PROJECT_ROOT/paku-iot/compose/mosquitto/mosquitto.prod.conf` (to be created if not available).
+- **Purpose**: Configures the Mosquitto MQTT broker for production use with enhanced security.
+- **How to create**:
+  1. Copy the development configuration as a starting point:
+     ```bash
+     cp $PROJECT_ROOT/paku-iot/compose/mosquitto/mosquitto.conf $PROJECT_ROOT/paku-iot/compose/mosquitto/mosquitto.prod.conf
+     ```
+  2. Modify the `mosquitto.prod.conf` file to include production-specific settings:
+     - **Disable anonymous access**:
+       ```conf
+       allow_anonymous false
+       ```
+     - **Enable authentication**:
+       ```conf
+       password_file /mosquitto/config/passwords
+       ```
+       Create the password file:
+       ```bash
+       mosquitto_passwd -c $PROJECT_ROOT/paku-iot/compose/mosquitto/config/passwords <username>
+       ```
+     - **Restrict listener access**:
+       ```conf
+       listener 1883 127.0.0.1
+       ```
+     - **Enable TLS encryption** (optional but recommended):
+       ```conf
+       listener 8883
+       cafile /mosquitto/config/ca.crt
+       certfile /mosquitto/config/server.crt
+       keyfile /mosquitto/config/server.key
+       ```
+  3. Update the Docker Compose configuration to use the production configuration file:
+     ```yaml
+     services:
+       mosquitto:
+         volumes:
+           - ./mosquitto/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf
+     ```
+
+### Best Practices for MQTT Broker Security
+1. **Authentication**:
+   - Always require username/password authentication in production.
+2. **Encryption**:
+   - Use TLS to encrypt communication between clients and the broker.
+3. **Access Control**:
+   - Use access control lists (ACLs) to restrict which clients can publish/subscribe to specific topics.
+4. **Monitoring**:
+   - Enable logging and monitor the broker for unusual activity.
+5. **Firewall Rules**:
+   - Restrict access to the MQTT broker to trusted IPs or networks.
+
+> **Important**: Always test the production configuration in a staging environment before deploying it to production.
+paku/
+├── paku-iot/   # Host-side code (Docker stack: Mosquitto, Postgres, Adminer, OTA static server)
+├── paku-core/  # ESP32 firmware (EDGE/CORE device code)
+├── paku/       # Common documentation for the project
+```
+
+Clone the repositories into the `paku` directory:
+```bash
+git clone https://github.com/ychefla/paku-iot.git
+git clone https://github.com/ychefla/paku-core.git
+git clone https://github.com/ychefla/paku.git
+```
+
+## Canonical paths & commands
+To make the project portable across different operating systems, use environment variables or relative paths. Set the `PROJECT_ROOT` environment variable to the root directory of the project:
+
+```bash
+export PROJECT_ROOT=~/GIT/paku  # Replace with the actual path on your system
+```
+
+### Example paths:
+- **Project root:** `$PROJECT_ROOT`
+- **Host repo:** `$PROJECT_ROOT/paku-iot`
+- **Firmware repo:** `$PROJECT_ROOT/paku-core`
+- **Compose dir:** `$PROJECT_ROOT/paku-iot/compose`
+
+### Commands:
+- Bring up the dev stack:
   ```bash
-  cd /Users/jossu/GIT/paku/paku-iot/compose
+  cd $PROJECT_ROOT/paku-iot/compose
   docker compose -f dev.yaml up -d
   ```
 
 - Mosquitto config used by dev:
-  - `/Users/jossu/GIT/paku/paku-iot/compose/mosquitto/mosquitto.conf`
+  - `$PROJECT_ROOT/paku-iot/compose/mosquitto/mosquitto.conf`
 
 > **Note:** Paths inside `dev.yaml` are **relative to the compose dir** and still correct (`../data`, `../services`). No change needed there.
 
 ## Secrets & safety (DO NOT COMMIT)
-- Device: `/Users/jossu/GIT/paku/paku-core/include/secrets.h` (gitignored).
-- Host: `/Users/jossu/GIT/paku/paku-iot/compose/.env` for DB creds (gitignored).
-- If suggesting commands or files, assistants must **never** print real secrets. Use placeholders.
+Secrets are critical for the operation of the project but must be handled securely. Below are the details for managing secrets for both the device and the host:
 
-## Branch policy
-- Long-lived **dev** branch is OK (solo developer).
-- PRs optional; can fast-forward merge dev→main when stable.
+### Device Secrets
+- **Location**: `$PROJECT_ROOT/paku-core/include/secrets.h` (gitignored).
+- **Purpose**: Contains sensitive information such as Wi-Fi credentials, API keys, or other device-specific secrets.
+- **How to create**:
+  1. Copy the example file (if available) or create a new `secrets.h` file:
+     ```bash
+     cp $PROJECT_ROOT/paku-core/include/secrets.example.h $PROJECT_ROOT/paku-core/include/secrets.h
+     ```
+  2. Populate the file with the required secrets. Example:
+     ```c
+     #define WIFI_SSID "YourWiFiSSID"
+     #define WIFI_PASSWORD "YourWiFiPassword"
+     #define API_KEY "YourAPIKey"
+     ```
+  3. Ensure the file is **never committed** to version control.
+
+### Host Secrets
+- **Location**: `$PROJECT_ROOT/paku-iot/compose/.env` (gitignored).
+- **Purpose**: Stores environment variables such as database credentials, MQTT broker credentials, and other host-side secrets.
+- **How to create**:
+  1. Copy the example file (if available) or create a new `.env` file:
+     ```bash
+     cp $PROJECT_ROOT/paku-iot/compose/.env.example $PROJECT_ROOT/paku-iot/compose/.env
+     ```
+  2. Populate the file with the required environment variables. Example:
+     ```env
+     POSTGRES_USER=your_db_user
+     POSTGRES_PASSWORD=your_db_password
+     MQTT_USER=your_mqtt_user
+     MQTT_PASSWORD=your_mqtt_password
+     ```
+  3. Ensure the file is **never committed** to version control.
+
+### Best Practices for Secrets Management
+1. **Use a Secrets Manager**:
+   - For production environments, use a dedicated secrets management tool such as:
+     - [HashiCorp Vault](https://www.vaultproject.io/)
+     - [AWS Secrets Manager](https://aws.amazon.com/secrets-manager/)
+     - [Azure Key Vault](https://azure.microsoft.com/en-us/services/key-vault/)
+     - [Docker Secrets](https://docs.docker.com/engine/swarm/secrets/)
+2. **Environment-Specific Secrets**:
+   - Use separate secrets for development, staging, and production environments.
+   - Avoid reusing secrets across environments.
+3. **Access Control**:
+   - Limit access to secrets to only those who need it.
+   - Use role-based access control (RBAC) where possible.
+4. **Audit and Rotate Secrets**:
+   - Regularly audit who has access to secrets.
+   - Rotate secrets periodically and immediately if a breach is suspected.
+
+> **Important**: If suggesting commands or files, assistants must **never** print real secrets. Use placeholders instead.
+
+## Docker Compose Configuration
+
+### Development Configuration
+- **File**: `$PROJECT_ROOT/paku-iot/compose/dev.yaml`
+- **Purpose**: Used to bring up the development stack with services like Mosquitto, Postgres, Adminer, and the OTA static server.
+- **How to use**:
+  ```bash
+  cd $PROJECT_ROOT/paku-iot/compose
+  docker compose -f dev.yaml up -d
+  ```
+- **Notes**:
+  - The `dev.yaml` file uses relative paths (e.g., `../data`, `../services`) to ensure portability.
+  - This configuration is optimized for local development and testing.
+
+### Production Configuration
+- **File**: `$PROJECT_ROOT/paku-iot/compose/prod.yaml` (to be created if not available).
+- **Purpose**: Used to deploy the stack in a production environment with stricter security and performance optimizations.
+- **How to create**:
+  1. Copy the `dev.yaml` file as a starting point:
+     ```bash
+     cp $PROJECT_ROOT/paku-iot/compose/dev.yaml $PROJECT_ROOT/paku-iot/compose/prod.yaml
+     ```
+  2. Modify the `prod.yaml` file to include production-specific settings:
+     - Use production-grade images (e.g., remove debugging tools).
+     - Configure persistent storage for databases.
+     - Use secrets management tools (e.g., Docker Secrets) for sensitive data.
+     - Restrict service access to specific IPs or networks.
+  3. Bring up the production stack:
+     ```bash
+     cd $PROJECT_ROOT/paku-iot/compose
+     docker compose -f prod.yaml up -d
+     ```
+
+### Best Practices for Docker Compose
+1. **Separate Configurations**:
+   - Always maintain separate `dev.yaml` and `prod.yaml` files to avoid accidental misuse.
+2. **Environment Variables**:
+   - Use `.env` files to manage environment-specific variables for both development and production.
+3. **Health Checks**:
+   - Add health checks to critical services (e.g., Mosquitto, Postgres) to ensure they are running properly.
+4. **Networking**:
+   - In production, restrict service access to trusted networks and use firewalls to block unauthorized access.
+5. **Monitoring**:
+   - Integrate monitoring tools (e.g., Prometheus, Grafana) to track the health and performance of services.
+
+> **Important**: Never use the `dev.yaml` file in production, as it may lack the necessary security and performance optimizations.
 
 ## Current decisions
 - Using **Docker Desktop** locally.
@@ -50,6 +263,8 @@
    ```
 4) Create `.env` in `/Users/jossu/GIT/paku/paku-iot/compose` when we’re ready (never commit).
 5) Flash ESP32 from `/Users/jossu/GIT/paku/paku-core` with PlatformIO.
+6) Create Grafana dashboard file: `/Users/jossu/GIT/paku/paku-iot/grafana/dashboards/sprint1_measurements.json` (single panel querying `measurements`).
+7) Add `.env.example` to `/Users/jossu/GIT/paku/paku-iot/compose` with `PGUSER`, `PGPASSWORD`, `PGDATABASE` placeholders.
 
 ## How assistants should use this file
 - **Always read/summarize this file first** before proposing changes.
@@ -57,10 +272,87 @@
 - Keep changes minimal and aligned with decisions here.
 - Topics that have not yet been agreed on, but require discussion should be categorized and discussed under "Discussion - open topics". This is where improvement suggestions, found problems, etc. are added and discussed befor making decision. Once the decision is made and approved by human the topic is moved to decisions and removed from discussion. Everyone should tag themselves so that it is clear who made the comment or raised the topic. Human is called Jossu and uses @Jossu.
 
-## Discussion - open topics
+### Sprint 1 — Hello Data Path (source of truth)
 
-```
-### Open topics for team discussion
+**Goal:** Prove end-to-end telemetry: Edge → MQTT → Collector → Postgres (+ OTA alive).
+
+**Scope**
+- Local stack up via `compose/dev.yaml`: Mosquitto :1883, Postgres+Adminer :8080, OTA :8081 (healthchecks green).
+- Edge stub (paku-core) publishes heartbeat + one sample metric to `paku/<device>/tele/...`.
+- Minimal collector writes to Postgres table `measurements (ts timestamptz default now(), topic text, payload jsonb)`.
+- Secrets hygiene: `.env.example` (placeholders); `.env` & `secrets.h` ignored.
+- CI lint: `docker compose -f compose/dev.yaml config -q` + `yamllint`.
+- Grafana panel (**mandatory**): **dashboard JSON lives at** `/Users/jossu/GIT/paku/paku-iot/grafana/dashboards/sprint1_measurements.json` (single panel visualizing data from `measurements` in Postgres).
+- OTA healthcheck file present at `/Users/jossu/GIT/paku/paku-iot/services/ota/health.txt` and referenced by container healthcheck.
+
+**Done criteria**
+- `mosquitto_pub` test appears in DB.
+- Edge heartbeat appears in DB.
+- `http://localhost:8081/health.txt` returns 200.
+- Adminer reachable at `http://localhost:8080`.
+- Grafana dashboard JSON exists at `/Users/jossu/GIT/paku/paku-iot/grafana/dashboards/sprint1_measurements.json` and, when imported into Grafana, shows data from table `measurements`.
+
+**Ownership**
+- Owner: @Jossu  
+- Assistants: @Architect-GPT, @Review-GPT, @Implementer-GPT  
+- Tasks mirrored under “Open tasks”.
+
+**Sprint 1 picks from “Discussion – open topics”**
+- #1 Healthchecks & startup ordering → Ensure OTA has a healthcheck and Adminer waits on Postgres (`depends_on: condition: service_healthy`).
+- #2 Dashboards under version control → Create the single dashboard JSON at the path above; alerts deferred.
+- #3 Secrets hygiene → Add `.env.example` in `/Users/jossu/GIT/paku/paku-iot/compose` with placeholders; keep `.env` in `.gitignore`.
+- #5 CI (minimal) → Add GitHub Actions to run `docker compose -f compose/dev.yaml config -q` and `yamllint`.
+- #9 VS Code ergonomics → Add minimal `.vscode/tasks.json` to start/stop stack and check health.
+- #12 OTA static server → Include `/health.txt` and container healthcheck in `dev.yaml`.
+
+## Feature Backlog (Parking Lot) — [Architect‑GPT]
+
+Organized by category. Pick from here for future sprints; not required for Sprint 1.
+
+### Observability & Ops
+- Alerting rules in Grafana for sensor silence and thresholds (email/Telegram webhook).
+- Centralized logs with Loki + Promtail (collector, edge-sim, mosquitto).
+- Grafana annotations emitted by collector on deploy/edge restart.
+
+### Data & Storage
+- Nightly `pg_dump` backups to a named volume + optional S3/Backblaze target.
+- Schema migrations with Flyway/Atlas; CI check to block drift.
+- Retention policy job: prune raw `measurements` after 30–90 days once rollups exist.
+
+### Security & Secrets
+- `age` + `sops` for secrets at rest; add `.sops.yaml` policy (optionally use KMS).
+- Least‑privileged DB user for Grafana (read‑only).
+- Mosquitto auth: per‑device user, ACL templates.
+
+### Edge / Device
+- Device registry (device_id, label, owner, location, tags).
+- OTA bundle signing; version check endpoint; progressive rollout rings.
+
+### Collector & Pipelines
+- JSON schema validation; reject malformed payloads with reason.
+- Enrich messages with device metadata; write to `measurements_enriched`.
+- Dead‑letter queue (DLQ) MQTT topic for parse failures.
+
+### Environments & DX
+- Compose profiles: `dev` / `prod`; `.env` files documented.
+- DevContainer base tweaks: arm64/x64 support, preinstalled tools (`psql`, `mosquitto-clients`).
+- Makefile shim for common tasks (`make up`, `make logs`, `make psql`).
+
+### Testing & QA
+- Unit tests for collector (payload → row).
+- E2E test: spin docker‑compose, publish sample Ruuvi frames, assert rows in Postgres.
+- Load test (`mosquitto_pub` loop) with 1–5k msgs/min.
+
+### Documentation
+- “First run” guide; troubleshooting matrix.
+- Architecture diagram (Mermaid/PlantUML) under `/docs`.
+
+### Performance & Reliability
+- Index tuning on `measurements(ts, topic)`.
+- Monthly partitioning and maintenance jobs (VACUUM/ANALYZE).
+## Discussion - Topics for team discussion
+
+### Open topics 
 
 1) **[@Review-GPT]Healthchecks & startup ordering**
    - **Observation:** Some dockerized services typically lack explicit `healthcheck` and `depends_on: condition: service_healthy` in early scaffolds.
@@ -181,3 +473,5 @@
    - **Rationale:** Reduce ambiguity about where docs or CI config belong. Better onboarding for future contributors or assistants.
    - **Action:** Clarify in AI_COLLAB that `paku/` is documentation-only and should not contain runtime code. Re-evaluate whether `.gitignore` fully excludes nested repos.
    - **[@Implementer-GPT] Comment:** Structure is solid and aligns with common monorepo-lite patterns. Only improvement might be to clearly separate code (iot/core) vs coordination/meta-docs (paku/).
+
+   ### Closed topics
