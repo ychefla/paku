@@ -1,5 +1,78 @@
 # AI_COLLAB – Shared context for assistants
 
+## Current collaboration model (authoritative)
+
+### Roles
+
+
+# AI Collaboration Guide (Paku Project)
+
+## Roles
+
+- **@Jossu (human developer)**  
+  Owns scope, priorities and final decisions. Writes / approves and runs the code, merges branches, and decides when something is “done”.
+
+- **@Architect-GPT (CHAT-GPT)**  
+  Works only at architecture / configuration / documentation level. Designs stack layout, Docker Compose, devcontainer, directory structure and high‑level flows. May edit markdown, YAML, simple Dockerfiles and small glue scripts when explicitly asked. Does not implement business logic or large chunks of application code. Ensures repo cleanliness. Validates decisions.
+
+- **Copilot / Implementer tools**  
+  Generate and edit actual code inside the repositories (Python, C/C++, PlatformIO, etc.) following structures defined here. They are used from within VS Code by @Jossu. Obeys architecture designed by Architect-GPT, but may suggest improvements.
+
+- **@Review-GPT (optional)**  
+  Reviews diffs, looks for regressions, and comments on architecture & maintainability.
+
+### Rules
+
+- Architect-GPT:
+  - focuses on big picture, not micro‑implementation
+  - never rewrites large source files unless explicitly asked
+  - prefers incremental, minimal changes that keep the repos clean
+- Copilot:
+  - writes the real logic (collector, emulator, firmware, APIs)
+  - follows the directory structure and contracts defined here
+- All assistants:
+  - respect that the project is **personal, not a product**, and should stay lightweight
+  - keep sprint scope small and avoid gold‑plating
+
+### How collaboration works
+- Jossu asks directly.
+- Architect-GPT produces high-level structure (YAML, SQL, flow diagrams).
+- Copilot writes implementation inside files.
+- Architect-GPT never rewrites entire files unless instructed (oboe/edit_file).
+
+### Files each agent can modify
+- Architect-GPT: config, compose, documentation, devcontainer
+- Copilot: python, c++, platformio, collector, emulator, firmware
+- Human developer: final integrations
+
+### Workflow per sprint
+1. Human defines goal
+2. Architect-GPT writes structure
+3. Copilot writes code into correct repo/subfolder
+4. Human tests stack
+5. Human merges dev → main
+
+## Current technical baseline (authoritative)
+
+- Monorepo root: `/Users/jossu/GIT/paku`
+- Repositories:
+  - `/Users/jossu/GIT/paku/paku-iot` → cloud / backend stack
+  - `/Users/jossu/GIT/paku/paku-core` → ESP32 firmware (to be refreshed in a later sprint)
+- Unified runtime stack (no dev/prod split) lives in `paku-iot/compose/stack.yaml`.
+- Services live in `paku-iot/stack/{mosquitto,ruuvi-emulator,collector,postgres,grafana}`.
+- Local development:
+  ```bash
+  cd /Users/jossu/GIT/paku/paku-iot
+  docker compose -f compose/stack.yaml up --build
+  ```
+  Docker is always run on the **host**, not inside the devcontainer.
+- Devcontainer:
+  - defined in `paku/.devcontainer`
+  - always open `paku.ws.code-workspace` in VS Code
+  - VS Code runs inside the devcontainer; stack runs on the host
+- Postgres & Grafana use named volumes (`paku_pgdata`, `paku_grafana`) for persistence.
+- Mosquitto is intentionally simple and open for local development; all production‑grade hardening notes in this file are **future/optional**.
+
 ## Prerequisites
 To ensure the project works correctly, all repositories must be cloned into the same parent directory. The expected structure is as follows:
 
@@ -197,7 +270,7 @@ Secrets are critical for the operation of the project but must be handled secure
 
 > **Important**: If suggesting commands or files, assistants must **never** print real secrets. Use placeholders instead.
 
-## Docker Compose Configuration
+## [ARCHIVED] Docker Compose Configuration (old dev/prod split)
 
 ### Development Configuration
 - **File**: `$PROJECT_ROOT/paku-iot/compose/dev.yaml`
@@ -244,14 +317,14 @@ Secrets are critical for the operation of the project but must be handled secure
 
 > **Important**: Never use the `dev.yaml` file in production, as it may lack the necessary security and performance optimizations.
 
-## Current decisions
+## [ARCHIVED] Current decisions (old dev.yaml-based stack)
 - Using **Docker Desktop** locally.
 - Using `compose/dev.yaml` (paths use `../data` and `../services` relative to `compose/`).
 - MQTT broker: Eclipse Mosquitto on port 1883 with local persistence.
 - Postgres 15 with Adminer on `http://localhost:8080`.
 - OTA static server on `http://localhost:8081` (serving `/Users/jossu/GIT/paku/paku-iot/services/ota`).
 
-## Open tasks (short)
+## [ARCHIVED] Open tasks (old dev stack)
 1) Finish installing Docker Desktop.
 2) Start stack:
    ```bash
@@ -267,12 +340,13 @@ Secrets are critical for the operation of the project but must be handled secure
 7) Add `.env.example` to `/Users/jossu/GIT/paku/paku-iot/compose` with `PGUSER`, `PGPASSWORD`, `PGDATABASE` placeholders.
 
 ## How assistants should use this file
-- **Always read/summarize this file first** before proposing changes.
-- Propose commands with **full absolute paths** as above.
-- Keep changes minimal and aligned with decisions here.
-- Topics that have not yet been agreed on, but require discussion should be categorized and discussed under "Discussion - open topics". This is where improvement suggestions, found problems, etc. are added and discussed befor making decision. Once the decision is made and approved by human the topic is moved to decisions and removed from discussion. Everyone should tag themselves so that it is clear who made the comment or raised the topic. Human is called Jossu and uses @Jossu.
 
-### Sprint 1 — Hello Data Path (source of truth)
+- Always read/summarize the sections **“Current collaboration model”** and **“Current technical baseline”** before proposing changes.
+- Propose commands with **full absolute paths** (based on `/Users/jossu/GIT/paku/...`) unless there is a very strong reason not to.
+- Keep changes minimal and aligned with the current unified stack (`paku-iot/compose/stack.yaml`) and the monorepo structure described here.
+- Topics that have not yet been agreed on, but require discussion, should be added under **“Discussion – open topics”** with a short tag like `[@Architect-GPT]` or `[@Implementer-GPT]`. Once @Jossu has decided, move the item into the relevant “decisions” or “archived” section and clean up duplicates.
+
+### [ARCHIVED] Sprint 1 — Hello Data Path (old plan, kept for reference)
 
 **Goal:** Prove end-to-end telemetry: Edge → MQTT → Collector → Postgres (+ OTA alive).
 

@@ -1,3 +1,5 @@
+TÄMÄ ON VAIN CHAT GPT:LLE
+
 Tässä on ollut hieman paussia projektin kanssa, mutta nyt voitaisiin jatkaa ainakin vähän. Tutkailin aikaansaannoksia ja ei näyttänyt oikein sopivalta tähän projektiin useammastakin syystä:
 
 - Sun rooli on olla arkkitehtina, mutta ei koodarina. Eli sä autat suurten linjojen kanssa ja kerrot jos/kun joku on menossa huonoon suuntaan ja ohjaat oikeampaan suuntaan. Vaikka sulla olisi intoa ja kykyä tuottaa myös koodia, sulla ei ole riittävän hyvää pääsyä koodiin. Jätetään se mulle ja copilotille. Miltä kuulostaa?
