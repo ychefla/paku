@@ -1,10 +1,3 @@
-# AI_COLLAB – Shared context for assistants
-
-## Current collaboration model (authoritative)
-
-### Roles
-
-
 # AI Collaboration Guide (Paku Project)
 
 ## Roles
@@ -54,7 +47,7 @@
 
 ## Current technical baseline (authoritative)
 
-- Monorepo root: `/Users/jossu/GIT/paku`
+- Monorepo root (for common stuff): `/Users/jossu/GIT/paku`
 - Repositories:
   - `/Users/jossu/GIT/paku/paku-iot` → cloud / backend stack
   - `/Users/jossu/GIT/paku/paku-core` → ESP32 firmware (to be refreshed in a later sprint)
@@ -70,30 +63,22 @@
   - defined in `paku/.devcontainer`
   - always open `paku.ws.code-workspace` in VS Code
   - VS Code runs inside the devcontainer; stack runs on the host
-- Postgres & Grafana use named volumes (`paku_pgdata`, `paku_grafana`) for persistence.
+- Postgres & Grafana use named volumes (`paku_postgres_gdata`, `paku_grafana_data`) for persistence.
 - Mosquitto is intentionally simple and open for local development; all production‑grade hardening notes in this file are **future/optional**.
 
 ## Prerequisites
 To ensure the project works correctly, all repositories must be cloned into the same parent directory. The expected structure is as follows:
 
+## MQTT Broker – future production hardening (optional)
 
-## MQTT Broker Configuration
-
-## TODO: Secure the MQTT Broker for Production
+### TODO: Secure the MQTT Broker
 - **Task**: Add authentication and TLS encryption to the Mosquitto broker in production.
 - **Steps**:
   1. Generate or obtain the following files:
      - `passwords`: Use the `mosquitto_passwd` command to create a password file.
      - `ca.crt`, `server.crt`, `server.key`: Obtain or generate TLS certificates for encrypting communication.
-  2. Update the `prod.yaml` file to include the following volumes:
-     ```yaml
-     volumes:
-       - ./mosquitto/config/passwords:/mosquitto/config/passwords
-       - ./mosquitto/config/ca.crt:/mosquitto/config/ca.crt
-       - ./mosquitto/config/server.crt:/mosquitto/config/server.crt
-       - ./mosquitto/config/server.key:/mosquitto/config/server.key
-     ```
-  3. Update the `mosquitto.prod.conf` file to enable authentication and TLS:
+  2. 
+  3. Update your Mosquitto configuration to enable authentication and TLS (when you eventually add a hardened production setup):
      ```conf
      allow_anonymous false
      password_file /mosquitto/config/passwords
@@ -103,66 +88,6 @@ To ensure the project works correctly, all repositories must be cloned into the 
      keyfile /mosquitto/config/server.key
      ```
   4. Test the configuration in a staging environment before deploying to production.
-
-### Development Configuration
-- **File**: `$PROJECT_ROOT/paku-iot/compose/mosquitto/mosquitto.conf`
-- **Purpose**: Configures the Mosquitto MQTT broker for development purposes.
-- **Example Configuration**:
-  ```conf
-  # Listen on port 1883 for MQTT connections
-  listener 1883
-  allow_anonymous true
-
-  # Persistence settings
-  persistence true
-  persistence_location /mosquitto/data/
-
-  # Log settings
-  log_dest stdout
-  ```
-- **Notes**:
-  - The above configuration allows anonymous connections, which is acceptable for local development but **must not** be used in production.
-  - The persistence settings ensure that messages are retained across broker restarts.
-
-### Production Configuration
-- **File**: `$PROJECT_ROOT/paku-iot/compose/mosquitto/mosquitto.prod.conf` (to be created if not available).
-- **Purpose**: Configures the Mosquitto MQTT broker for production use with enhanced security.
-- **How to create**:
-  1. Copy the development configuration as a starting point:
-     ```bash
-     cp $PROJECT_ROOT/paku-iot/compose/mosquitto/mosquitto.conf $PROJECT_ROOT/paku-iot/compose/mosquitto/mosquitto.prod.conf
-     ```
-  2. Modify the `mosquitto.prod.conf` file to include production-specific settings:
-     - **Disable anonymous access**:
-       ```conf
-       allow_anonymous false
-       ```
-     - **Enable authentication**:
-       ```conf
-       password_file /mosquitto/config/passwords
-       ```
-       Create the password file:
-       ```bash
-       mosquitto_passwd -c $PROJECT_ROOT/paku-iot/compose/mosquitto/config/passwords <username>
-       ```
-     - **Restrict listener access**:
-       ```conf
-       listener 1883 127.0.0.1
-       ```
-     - **Enable TLS encryption** (optional but recommended):
-       ```conf
-       listener 8883
-       cafile /mosquitto/config/ca.crt
-       certfile /mosquitto/config/server.crt
-       keyfile /mosquitto/config/server.key
-       ```
-  3. Update the Docker Compose configuration to use the production configuration file:
-     ```yaml
-     services:
-       mosquitto:
-         volumes:
-           - ./mosquitto/mosquitto.prod.conf:/mosquitto/config/mosquitto.conf
-     ```
 
 ### Best Practices for MQTT Broker Security
 1. **Authentication**:
@@ -204,16 +129,12 @@ export PROJECT_ROOT=~/GIT/paku  # Replace with the actual path on your system
 - **Compose dir:** `$PROJECT_ROOT/paku-iot/compose`
 
 ### Commands:
-- Bring up the dev stack:
+- Bring up the stack:
   ```bash
-  cd $PROJECT_ROOT/paku-iot/compose
-  docker compose -f dev.yaml up -d
+  cd $PROJECT_ROOT/paku-iot
+  docker compose -f compose/stack.yaml up --build
   ```
 
-- Mosquitto config used by dev:
-  - `$PROJECT_ROOT/paku-iot/compose/mosquitto/mosquitto.conf`
-
-> **Note:** Paths inside `dev.yaml` are **relative to the compose dir** and still correct (`../data`, `../services`). No change needed there.
 
 ## Secrets & safety (DO NOT COMMIT)
 Secrets are critical for the operation of the project but must be handled securely. Below are the details for managing secrets for both the device and the host:
@@ -270,74 +191,6 @@ Secrets are critical for the operation of the project but must be handled secure
 
 > **Important**: If suggesting commands or files, assistants must **never** print real secrets. Use placeholders instead.
 
-## [ARCHIVED] Docker Compose Configuration (old dev/prod split)
-
-### Development Configuration
-- **File**: `$PROJECT_ROOT/paku-iot/compose/dev.yaml`
-- **Purpose**: Used to bring up the development stack with services like Mosquitto, Postgres, Adminer, and the OTA static server.
-- **How to use**:
-  ```bash
-  cd $PROJECT_ROOT/paku-iot/compose
-  docker compose -f dev.yaml up -d
-  ```
-- **Notes**:
-  - The `dev.yaml` file uses relative paths (e.g., `../data`, `../services`) to ensure portability.
-  - This configuration is optimized for local development and testing.
-
-### Production Configuration
-- **File**: `$PROJECT_ROOT/paku-iot/compose/prod.yaml` (to be created if not available).
-- **Purpose**: Used to deploy the stack in a production environment with stricter security and performance optimizations.
-- **How to create**:
-  1. Copy the `dev.yaml` file as a starting point:
-     ```bash
-     cp $PROJECT_ROOT/paku-iot/compose/dev.yaml $PROJECT_ROOT/paku-iot/compose/prod.yaml
-     ```
-  2. Modify the `prod.yaml` file to include production-specific settings:
-     - Use production-grade images (e.g., remove debugging tools).
-     - Configure persistent storage for databases.
-     - Use secrets management tools (e.g., Docker Secrets) for sensitive data.
-     - Restrict service access to specific IPs or networks.
-  3. Bring up the production stack:
-     ```bash
-     cd $PROJECT_ROOT/paku-iot/compose
-     docker compose -f prod.yaml up -d
-     ```
-
-### Best Practices for Docker Compose
-1. **Separate Configurations**:
-   - Always maintain separate `dev.yaml` and `prod.yaml` files to avoid accidental misuse.
-2. **Environment Variables**:
-   - Use `.env` files to manage environment-specific variables for both development and production.
-3. **Health Checks**:
-   - Add health checks to critical services (e.g., Mosquitto, Postgres) to ensure they are running properly.
-4. **Networking**:
-   - In production, restrict service access to trusted networks and use firewalls to block unauthorized access.
-5. **Monitoring**:
-   - Integrate monitoring tools (e.g., Prometheus, Grafana) to track the health and performance of services.
-
-> **Important**: Never use the `dev.yaml` file in production, as it may lack the necessary security and performance optimizations.
-
-## [ARCHIVED] Current decisions (old dev.yaml-based stack)
-- Using **Docker Desktop** locally.
-- Using `compose/dev.yaml` (paths use `../data` and `../services` relative to `compose/`).
-- MQTT broker: Eclipse Mosquitto on port 1883 with local persistence.
-- Postgres 15 with Adminer on `http://localhost:8080`.
-- OTA static server on `http://localhost:8081` (serving `/Users/jossu/GIT/paku/paku-iot/services/ota`).
-
-## [ARCHIVED] Open tasks (old dev stack)
-1) Finish installing Docker Desktop.
-2) Start stack:
-   ```bash
-   cd /Users/jossu/GIT/paku/paku-iot/compose && docker compose -f dev.yaml up -d
-   ```
-3) Verify broker works:
-   ```bash
-   docker exec -it paku-mosquitto mosquitto_sub -h localhost -t '$SYS/broker/version' -C 1 -W 5
-   ```
-4) Create `.env` in `/Users/jossu/GIT/paku/paku-iot/compose` when we’re ready (never commit).
-5) Flash ESP32 from `/Users/jossu/GIT/paku/paku-core` with PlatformIO.
-6) Create Grafana dashboard file: `/Users/jossu/GIT/paku/paku-iot/grafana/dashboards/sprint1_measurements.json` (single panel querying `measurements`).
-7) Add `.env.example` to `/Users/jossu/GIT/paku/paku-iot/compose` with `PGUSER`, `PGPASSWORD`, `PGDATABASE` placeholders.
 
 ## How assistants should use this file
 
@@ -346,66 +199,45 @@ Secrets are critical for the operation of the project but must be handled secure
 - Keep changes minimal and aligned with the current unified stack (`paku-iot/compose/stack.yaml`) and the monorepo structure described here.
 - Topics that have not yet been agreed on, but require discussion, should be added under **“Discussion – open topics”** with a short tag like `[@Architect-GPT]` or `[@Implementer-GPT]`. Once @Jossu has decided, move the item into the relevant “decisions” or “archived” section and clean up duplicates.
 
-### [ARCHIVED] Sprint 1 — Hello Data Path (old plan, kept for reference)
+## Roadmap Structure
+This project uses three planning tiers:
+- **Next 1–2 sprints** — Items likely to be implemented soon; small, high‑impact, low‑complexity.
+- **Later / nice‑to‑have** — Useful but not required; do not influence current architecture.
+- **Archived / not relevant** — Old dev/prod-specific ideas or over-complex features; kept only for reference.
 
-**Goal:** Prove end-to-end telemetry: Edge → MQTT → Collector → Postgres (+ OTA alive).
+## Next 1–2 sprints (high priority)
+- CI + pre-commit (detect-secrets, yamllint, jsonlint).
+- `.env.example` creation + secrets hygiene.
+- Minimal Grafana dashboard provisioning folder (no Prometheus).
+- VS Code tasks for common docker operations.
+- Simple E2E test: spin stack, publish sample MQTT, verify row in Postgres.
 
-**Scope**
-- Local stack up via `compose/dev.yaml`: Mosquitto :1883, Postgres+Adminer :8080, OTA :8081 (healthchecks green).
-- Edge stub (paku-core) publishes heartbeat + one sample metric to `paku/<device>/tele/...`.
-- Minimal collector writes to Postgres table `measurements (ts timestamptz default now(), topic text, payload jsonb)`.
-- Secrets hygiene: `.env.example` (placeholders); `.env` & `secrets.h` ignored.
-- CI lint: `docker compose -f compose/dev.yaml config -q` + `yamllint`.
-- Grafana panel (**mandatory**): **dashboard JSON lives at** `/Users/jossu/GIT/paku/paku-iot/grafana/dashboards/sprint1_measurements.json` (single panel visualizing data from `measurements` in Postgres).
-- OTA healthcheck file present at `/Users/jossu/GIT/paku/paku-iot/services/ota/health.txt` and referenced by container healthcheck.
+## Later / nice‑to‑have (medium/low priority)
+- Loki + Promtail centralized logs.
+- Device registry (device_id metadata etc.).
+- OTA bundle signing + version metadata.
+- Dead‑letter queue for parse failures.
+- Rollup jobs + retention policies.
+- TimescaleDB migration option.
+- Cloud ingress (Caddy/Traefik) + TLS + domain.
+- Mosquitto exporter + `$SYS` metrics.
+- Automated backups to S3/Backblaze.
 
-**Done criteria**
-- `mosquitto_pub` test appears in DB.
-- Edge heartbeat appears in DB.
-- `http://localhost:8081/health.txt` returns 200.
-- Adminer reachable at `http://localhost:8080`.
-- Grafana dashboard JSON exists at `/Users/jossu/GIT/paku/paku-iot/grafana/dashboards/sprint1_measurements.json` and, when imported into Grafana, shows data from table `measurements`.
-
-**Ownership**
-- Owner: @Jossu  
-- Assistants: @Architect-GPT, @Review-GPT, @Implementer-GPT  
-- Tasks mirrored under “Open tasks”.
-
-**Sprint 1 picks from “Discussion – open topics”**
-- #1 Healthchecks & startup ordering → Ensure OTA has a healthcheck and Adminer waits on Postgres (`depends_on: condition: service_healthy`).
-- #2 Dashboards under version control → Create the single dashboard JSON at the path above; alerts deferred.
-- #3 Secrets hygiene → Add `.env.example` in `/Users/jossu/GIT/paku/paku-iot/compose` with placeholders; keep `.env` in `.gitignore`.
-- #5 CI (minimal) → Add GitHub Actions to run `docker compose -f compose/dev.yaml config -q` and `yamllint`.
-- #9 VS Code ergonomics → Add minimal `.vscode/tasks.json` to start/stop stack and check health.
-- #12 OTA static server → Include `/health.txt` and container healthcheck in `dev.yaml`.
+## Archived / not relevant (kept for reference)
+- Old dev/prod split (`dev.yaml`, `prod.yaml`, cloud.yaml drafts).
+- Prometheus + alert rules (not in scope for unified local stack).
+- Adminer/OTA legacy stack components.
+- Codespaces-specific compose overrides.
+- Reverse proxy routing logic for remote cloud deployment.
 
 ## Feature Backlog (Parking Lot) — [Architect‑GPT]
 
 Organized by category. Pick from here for future sprints; not required for Sprint 1.
 
-### Observability & Ops
-- Alerting rules in Grafana for sensor silence and thresholds (email/Telegram webhook).
-- Centralized logs with Loki + Promtail (collector, edge-sim, mosquitto).
-- Grafana annotations emitted by collector on deploy/edge restart.
-
 ### Data & Storage
 - Nightly `pg_dump` backups to a named volume + optional S3/Backblaze target.
 - Schema migrations with Flyway/Atlas; CI check to block drift.
 - Retention policy job: prune raw `measurements` after 30–90 days once rollups exist.
-
-### Security & Secrets
-- `age` + `sops` for secrets at rest; add `.sops.yaml` policy (optionally use KMS).
-- Least‑privileged DB user for Grafana (read‑only).
-- Mosquitto auth: per‑device user, ACL templates.
-
-### Edge / Device
-- Device registry (device_id, label, owner, location, tags).
-- OTA bundle signing; version check endpoint; progressive rollout rings.
-
-### Collector & Pipelines
-- JSON schema validation; reject malformed payloads with reason.
-- Enrich messages with device metadata; write to `measurements_enriched`.
-- Dead‑letter queue (DLQ) MQTT topic for parse failures.
 
 ### Environments & DX
 - Compose profiles: `dev` / `prod`; `.env` files documented.
@@ -420,10 +252,6 @@ Organized by category. Pick from here for future sprints; not required for Sprin
 ### Documentation
 - “First run” guide; troubleshooting matrix.
 - Architecture diagram (Mermaid/PlantUML) under `/docs`.
-
-### Performance & Reliability
-- Index tuning on `measurements(ts, topic)`.
-- Monthly partitioning and maintenance jobs (VACUUM/ANALYZE).
 ## Discussion - Topics for team discussion
 
 ### Open topics 
@@ -434,6 +262,7 @@ Organized by category. Pick from here for future sprints; not required for Sprin
    - **Rationale:** Deterministic startup and faster failure detection.
    - **Action (draft):** Implement in `/Users/jossu/GIT/paku/paku-iot/compose/dev.yaml` and future `cloud.yaml`.
    - **[@Architect-GPT] Comment:** Agreed. `dev.yaml` already includes Mosquitto + Postgres healthchecks. Next: add OTA (`wget -q --spider http://localhost/health`) and gate Adminer on Postgres via `depends_on: condition: service_healthy`.
+   - **Status:** Archived — based on old dev/prod/cloud stack.
 
 2) **[@Review-GPT] Dashboards & alerts under version control**
    - **Observation:** Grafana dashboards and Prometheus alert rules can drift if not checked into git.
@@ -442,6 +271,7 @@ Organized by category. Pick from here for future sprints; not required for Sprin
    - **Action:** Provision Grafana via files; add CI lint for YAML/JSON.
    - **[@Architect-GPT] Comment:** Create folders now (`paku-iot/grafana/dashboards/`, `paku-iot/prometheus/alerts/`) with placeholders; we can wire Grafana/Prom later—focus first on broker + data path.
    - **[@Implementer-GPT] Comment:** Ensure all dashboard JSON files have **unique `uid` values** to avoid Grafana provisioning conflicts. Add JSON schema lint (e.g. `jsonlint`) in pre-commit and/or CI.
+   - **Status:** Archived — based on old dev/prod/cloud stack.
 
 3) **[@Review-GPT]Secrets hygiene (.env.example + gitignore)**
    - **Observation:** Real secrets must remain local; an `.env.example` improves onboarding.
@@ -454,17 +284,19 @@ Organized by category. Pick from here for future sprints; not required for Sprin
    - **Observation:** We are using `compose/dev.yaml` for local; a `compose/cloud.yaml` for Hetzner will be needed.
    - **Proposal:** Keep absolute-path workflow from AI_COLLAB and maintain **relative** mounts inside YAML (paths are already correct per note).
    - **Rationale:** Predictable developer UX; fewer path errors.
-   - **Action:** Add `compose/cloud.yaml` skeleton with reverse proxy.
+   - **Action:** (future) Add `compose/cloud.yaml` skeleton with reverse proxy if/when a separate cloud deploy becomes necessary.
    - **[@Architect-GPT] Comment:** We’ll add `cloud.yaml` with a reverse proxy (Caddy/Traefik). Full HTTPS needs your own domain; without it we’ll start HTTP and use SSH tunnels for admin paths.
    - **[@Implementer-GPT] Comment:** Add `depends_on: condition: service_healthy` to `cloud.yaml` early. Choose **Traefik** for TLS auto-cert and easy routing via labels.
+   - **Status:** Archived — based on old dev/prod/cloud stack.
 
 5) **[@Review-GPT] CI + pre-commit**
    - **Observation:** No CI is defined yet in this repo.
    - **Proposal:** GitHub Actions to lint YAML, validate compose config, and build images. Pre-commit with `yamllint` and `detect-secrets`.
    - **Rationale:** Catch regressions early; block secret leaks.
    - **Action:** Add `.github/workflows/ci.yml` and `.pre-commit-config.yaml`.
-   - **[@Architect-GPT] Comment:** Minimal CI first: `docker compose -f compose/dev.yaml config -q`, `yamllint`. Then add build steps. Pre-commit to run `yamllint` + `detect-secrets`.
+   - **[@Architect-GPT] Comment:** Minimal CI first: `docker compose -f compose/stack.yaml config -q`, `yamllint`. Then add build steps. Pre-commit to run `yamllint` + `detect-secrets`.
    - **[@Implementer-GPT] Comment:** Add `jsonlint` to pre-commit for dashboard JSONs. Also validate `dev.yaml` using `docker compose config` in CI.
+   - **Status:** Active — eligible for Next 1–2 sprints.
 
 6) **[@Review-GPT]Mosquitto metrics**
    - **Observation:** Broker metrics/visibility helpful for debugging.
@@ -472,6 +304,7 @@ Organized by category. Pick from here for future sprints; not required for Sprin
    - **Rationale:** Prometheus can alert on disconnect spikes.
    - **Action:** Add exporter service to `dev.yaml`; scrape in Prometheus.
    - **[@Architect-GPT] Comment:** Enable `$SYS` topics now; exporter (e.g., `sapcc/mosquitto-exporter`) can come later once base path is stable.
+   - **Status:** Archived — based on old dev/prod/cloud stack.
 
 7) **[@Review-GPT]Cloud ingress & TLS**
    - **Observation:** Cloud stack needs HTTPS and a single entrypoint.
@@ -479,6 +312,7 @@ Organized by category. Pick from here for future sprints; not required for Sprin
    - **Rationale:** Security baseline; simpler routing to Grafana/API/OTA.
    - **Action:** Add reverse proxy service with labels/routers.
    - **[@Architect-GPT] Comment:** Let’s pick Caddy for simplicity. Auto-cert requires a domain you control; recommend buying a cheap domain and pointing A-record to Hetzner. Until then, keep HTTP and use SSH tunnels for secure access.
+   - **Status:** Archived — based on old dev/prod/cloud stack.
 
 8) **[@Review-GPT]Requirements traceability**
    - **Observation:** `docs/requirements.md` exists; mapping to implementation/tests isn’t captured.
@@ -494,6 +328,7 @@ Organized by category. Pick from here for future sprints; not required for Sprin
    - **Action:** Add minimal configs referencing absolute paths documented here.
    - **[@Architect-GPT] Comment:** Add `.vscode/tasks.json` for up/down/logs/health. Devcontainer optional for now since Docker Desktop is local and working.
    - **[@Implementer-GPT] Comment:** Devcontainer confirmed working. Stick to binary `docker-compose`, not `docker-compose-plugin` in Codespaces. Optional: define `devcontainer-feature.json` for reusable configs.
+   - **Status:** Active — eligible for Next 1–2 sprints.
 
 10) **[@Review-GPT]Repo structure & remotes**
     - **Observation:** Meta repo `/Users/jossu/GIT/paku` initialized but failed to push to `git@github.com:ychefla/paku.git` (repo not found).
@@ -516,6 +351,7 @@ Organized by category. Pick from here for future sprints; not required for Sprin
     - **Rationale:** Deterministic OTA tests.
     - **Action:** Add minimal nginx (or `python -m http.server`) container with healthcheck.
     - **[@Architect-GPT] Comment:** Create `/Users/jossu/GIT/paku/paku-iot/services/ota/health.txt` and add an Nginx healthcheck hitting it to verify the mount path (`../services/ota`).
+    - **Status:** Archived — based on old dev/prod/cloud stack.
 
 13) **[@Implementer-GPT] Grafana dashboard UID conflicts**
     - **Observation:** Multiple dashboards provisioned from files have conflicting `"uid"` fields (`KGnlUEp4s` seen multiple times).
@@ -528,18 +364,21 @@ Organized by category. Pick from here for future sprints; not required for Sprin
     - **Proposal:** Keep this minimal working setup and avoid using `docker-compose-plugin` for now.
     - **Rationale:** Verified working; avoids Codespaces dependency issues.
     - **Action:** Lock version of Compose if needed; keep `.devcontainer/Dockerfile` and `devcontainer.json` aligned.
+    - **Status:** Archived — based on old dev/prod/cloud stack.
 
 15) **[@Implementer-GPT] Pre-commit + detect-secrets**
     - **Observation:** No pre-commit config is yet defined, and secrets risk exists.
     - **Proposal:** Add `.pre-commit-config.yaml` with `detect-secrets`, `yamllint`, and `jsonlint`.
     - **Rationale:** Prevent leaking `.env` and ensure config file hygiene.
     - **Action:** Add file in repo root and require pre-commit in dev container (install in `postCreateCommand`).
+    - **Status:** Active — eligible for Next 1–2 sprints.
 
 16) **[@Implementer-GPT] TimescaleDB compatibility**
     - **Observation:** We're starting with Postgres JSONB but want future-proofing for Timescale.
     - **Proposal:** Use schema compatible with Timescale: use `timestamp`, `topic`, `payload JSONB` with index on `timestamp`.
     - **Rationale:** Easy transition to Timescale if needed.
     - **Action:** Ensure schema is created with Timescale compatibility in mind. If migrations are later added, document constraints.
+    - **Status:** Archived — based on old dev/prod/cloud stack.
 
 17) **[@Implementer-GPT]Meta structure consistency & clarity**
    - **Observation:** Project structure and documentation (e.g. AI_COLLAB.md) has significantly improved and is now well-aligned with long-term maintainability.
@@ -547,5 +386,6 @@ Organized by category. Pick from here for future sprints; not required for Sprin
    - **Rationale:** Reduce ambiguity about where docs or CI config belong. Better onboarding for future contributors or assistants.
    - **Action:** Clarify in AI_COLLAB that `paku/` is documentation-only and should not contain runtime code. Re-evaluate whether `.gitignore` fully excludes nested repos.
    - **[@Implementer-GPT] Comment:** Structure is solid and aligns with common monorepo-lite patterns. Only improvement might be to clearly separate code (iot/core) vs coordination/meta-docs (paku/).
+   - **Status:** Active — eligible for Next 1–2 sprints.
 
    ### Closed topics
