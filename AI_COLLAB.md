@@ -69,6 +69,13 @@
 ## Prerequisites
 To ensure the project works correctly, all repositories must be cloned into the same parent directory. The expected structure is as follows:
 
+```
+paku/
+├── paku-iot/   # Backend stack (Mosquitto, Ruuvi emulator, collector, Postgres, Grafana)
+├── paku-core/  # ESP32 firmware (EDGE/CORE device code)
+├── paku/       # Common documentation for the project
+```
+
 ## MQTT Broker – future production hardening (optional)
 
 ### TODO: Secure the MQTT Broker
@@ -156,12 +163,12 @@ Secrets are critical for the operation of the project but must be handled secure
   3. Ensure the file is **never committed** to version control.
 
 ### Host Secrets
-- **Location**: `$PROJECT_ROOT/paku-iot/compose/.env` (gitignored).
+- **Location**: `$PROJECT_ROOT/paku-iot/.env` (gitignored).
 - **Purpose**: Stores environment variables such as database credentials, MQTT broker credentials, and other host-side secrets.
 - **How to create**:
   1. Copy the example file (if available) or create a new `.env` file:
      ```bash
-     cp $PROJECT_ROOT/paku-iot/compose/.env.example $PROJECT_ROOT/paku-iot/compose/.env
+     cp $PROJECT_ROOT/paku-iot/.env.example $PROJECT_ROOT/paku-iot/.env
      ```
   2. Populate the file with the required environment variables. Example:
      ```env
