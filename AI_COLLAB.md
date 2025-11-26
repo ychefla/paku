@@ -211,6 +211,7 @@ This project uses three planning tiers:
 - Minimal Grafana dashboard provisioning folder (no Prometheus).
 - VS Code tasks for common docker operations.
 - Simple E2E test: spin stack, publish sample MQTT, verify row in Postgres.
+- Message validation in the collector (validate MQTT payload against the documented schema; log and reject malformed messages instead of crashing).
 
 ## Later / nice‑to‑have (medium/low priority)
 - Loki + Promtail centralized logs.
@@ -222,6 +223,7 @@ This project uses three planning tiers:
 - Cloud ingress (Caddy/Traefik) + TLS + domain.
 - Mosquitto exporter + `$SYS` metrics.
 - Automated backups to S3/Backblaze.
+- Telegram integration for alerts (send threshold breaches and critical notifications to mobile via a bot).
 
 ## Archived / not relevant (kept for reference)
 - Old dev/prod split (`dev.yaml`, `prod.yaml`, cloud.yaml drafts).

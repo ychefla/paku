@@ -1,4 +1,4 @@
-TÄMÄ ON VAIN CHAT GPT:LLE
+TÄMÄ ON VAIN CHAT GPT:LLE (EI COPILOTILLE!)
 
 Tässä on ollut hieman paussia projektin kanssa, mutta nyt voitaisiin jatkaa ainakin vähän. Tutkailin aikaansaannoksia ja ei näyttänyt oikein sopivalta tähän projektiin useammastakin syystä:
 
