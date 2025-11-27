@@ -2,6 +2,9 @@
   // Name of the development environment shown inside VS Code.
   "name": "paku-dev",
 
+  // Use the official base image for Ubuntu-based dev containers.
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+
   // Use the Dockerfile in this .devcontainer directory to build the image.
   "dockerFile": "Dockerfile",
 
@@ -9,6 +12,8 @@
   // so the whole paku/ repository is included.
   "context": "..",
 
+
+  
   // VS Code extensions that should be installed inside the container.
   "customizations": {
     "vscode": {
@@ -19,8 +24,14 @@
         // IntelliSense for Python
         "ms-python.vscode-pylance",
 
-        // Docker integration (containers, images, logs)
-        "ms-azuretools.vscode-docker"
+        // Copilot for AI-assisted coding
+        "GitHub.copilot",
+
+        // Copilot chat extension can be installed manually if needed
+        "GitHub.copilot-chat",
+
+        // PlatformIO IDE for embedded development
+        "platformio.platformio-ide"
       ]
     }
   },

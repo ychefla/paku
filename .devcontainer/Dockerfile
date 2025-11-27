@@ -9,12 +9,14 @@ FROM python:3.12-slim
 #  - git      : version control
 #  - curl     : simple HTTP tool for testing endpoints
 #  - vim      : quick in-container editing if needed
-#
+#  - docker   : docker environment
 # Clean apt caches afterward to keep the image small.
 RUN apt-get update && apt-get install -y \
     git \
     curl \
     vim \
+    #docker.io \
+    #docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------------------

@@ -11,6 +11,7 @@
       }
     ],
     "settings": {
+      "json.validate.enable": false
       // put shared workspace settings here (optional)
     }
   }
