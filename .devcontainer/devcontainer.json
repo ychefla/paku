@@ -37,12 +37,12 @@
   },
 
   // Use root for simplicity in a personal dev environment.
-  "remoteUser": "root"
-  ,
-  "remoteEnv": {
-    // Disable inherited SSH agent socket from the host.
-    "SSH_AUTH_SOCK": ""
-  }
+  "remoteUser": "root",
+  
+  // Mount SSH agent socket from host for git authentication
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
+  ]
   // NOTE:
   // We intentionally do NOT set "workspaceFolder" here.
   // VS Code will use its default (e.g. /workspaces/paku),
