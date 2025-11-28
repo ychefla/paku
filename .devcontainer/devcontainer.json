@@ -42,6 +42,12 @@
   // Mount SSH agent socket from host for git authentication
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
+  ],
+
+  // Pass through USB devices for embedded development (macOS compatible)
+  "runArgs": [
+    "--privileged",
+    "-v", "/dev:/dev"
   ]
   // NOTE:
   // We intentionally do NOT set "workspaceFolder" here.
