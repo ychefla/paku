@@ -1,13 +1,20 @@
 {
     "folders": [
       {
-        "path": "./paku-iot"
+        "path": "./paku-iot",
+        "name": "paku-iot (backend)"
       },
       {
-        "path": "./paku-core"
+        "path": "./paku-core",
+        "name": "paku-core (repository)"
       },
       {
-        "path": "."
+        "path": "./paku-core/paku_core",
+        "name": "paku-core (firmware)"
+      },
+      {
+        "path": ".",
+        "name": "paku (root)"
       }
     ],
     "settings": {
