@@ -25,62 +25,44 @@ Align OTA commands with the edge device topic structure for consistency:
 1. Deploy firmware v1.4.0 to all devices using current workflow
 2. Wait for all devices to update (check database for `current_firmware_version`)
 
-## Phase 2: Update Workflow (PENDING)
+## Phase 2: Update Workflow ✅ COMPLETED
 
 **Prerequisites:**
 - ✅ All devices running firmware v1.4.0 or higher
 - All devices must show `current_firmware_version >= 1.4.0` in database
 
-**Changes to Make:**
+**Status:** Workflow updated (commit previous), all devices using new command topic
+
+**Changes Made:**
 In `paku-iot/.github/workflows/ota-update-esp.yaml`:
+- Updated MQTT topic from `paku/devices/{id}/cmd/ota` → `paku/edge/{id}/cmd/ota`
 
-### Line ~431: Update MQTT topic in send_ota_command function
+## Phase 3: Remove Legacy Subscription ✅ COMPLETED (v1.4.1)
 
-**Before:**
-```bash
-mosquitto_pub -h "$MQTT_BROKER" -p 1883 \
-  -t "paku/devices/${device_id}/cmd/ota" \
-  -m "${ota_payload}"
-```
+**Status:** Firmware updated to v1.4.1
 
-**After:**
-```bash
-mosquitto_pub -h "$MQTT_BROKER" -p 1883 \
-  -t "paku/edge/${device_id}/cmd/ota" \
-  -m "${ota_payload}"
-```
+**Changes:**
+- Removed legacy `paku/devices/{id}/cmd/ota` subscription
+- Device only subscribes to `paku/edge/{id}/cmd/ota`
+- Version bumped from 1.4.0 → 1.4.1
 
-### Test Plan
+## Phase 4: Update Response Topics ✅ COMPLETED (v1.4.2)
 
-1. **Verify all devices are updated:**
-   ```bash
-   curl -s -H "X-API-Key: ${OTA_API_KEY}" \
-     "http://37.27.192.107:8080/api/admin/devices?limit=500" \
-     | jq -r '.devices[] | select(.current_firmware_version < "1.4.0") | "\(.device_id) - \(.current_firmware_version)"'
-   ```
-   Should return empty (no devices below v1.4.0)
+**Status:** Firmware updated to v1.4.2
 
-2. **Test new topic manually:**
-   ```bash
-   # Pick a test device
-   DEVICE_ID="ESP8266-9608CF16"
-   
-   # Send OTA command to NEW topic
-   mosquitto_pub -h 37.27.192.107 -p 1883 \
-     -t "paku/edge/${DEVICE_ID}/cmd/ota" \
-     -m '{"url":"http://example.com/test.bin","version":"test"}'
-   
-   # Monitor device response
-   mosquitto_sub -h 37.27.192.107 -p 1883 -v \
-     -t "paku/devices/${DEVICE_ID}/ota/#"
-   ```
+**Changes:**
+- Updated all OTA response topics from `paku/devices` to `paku/edge`:
+  - Status: `paku/edge/{id}/ota/status`
+  - Progress: `paku/edge/{id}/ota/progress`
+  - Result: `paku/edge/{id}/ota/result`
+- Updated `ota_update.sh` script to monitor new topics
+- Version bumped from 1.4.1 → 1.4.2
 
-3. **Update workflow and test:**
-   - Make the topic change in workflow file
-   - Run workflow with single device
-   - Verify OTA command received and processed
+**Files Modified:**
+- `paku_core/src/main.cpp` - Updated 3 topic paths
+- `paku_core/ota_update.sh` - Updated monitoring topics
 
-## Phase 3: Cleanup (Future)
+## Phase 5: Cleanup (Future)
 
 **Timeline:** After 1-2 months of stable operation
 
@@ -98,17 +80,22 @@ If Phase 2 fails:
 
 ## Monitoring
 
-Check device registration after Phase 2:
+Check device OTA activity:
 ```bash
 # Verify devices receiving OTA commands
 docker logs -f paku_collector | grep "ota"
 
-# Check MQTT traffic
+# Check MQTT command topic
 mosquitto_sub -h 37.27.192.107 -p 1883 -v -t 'paku/edge/+/cmd/ota'
+
+# Check MQTT response topics
+mosquitto_sub -h 37.27.192.107 -p 1883 -v -t 'paku/edge/+/ota/#'
 ```
 
 ---
 
 **Last Updated:** 2025-12-26  
 **Phase 1 Completion:** 2025-12-26  
-**Phase 2 Target:** After all devices running v1.4.0
+**Phase 2 Completion:** 2025-12-26  
+**Phase 3 Completion:** 2025-12-26  
+**Phase 4 Completion:** 2025-12-26
