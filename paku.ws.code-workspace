@@ -13,6 +13,10 @@
         "name": "paku-core (firmware)"
       },
       {
+        "path": "./hydronic-heater",
+        "name": "hydronic-heater"
+      },
+      {
         "path": ".",
         "name": "paku (root)"
       }
