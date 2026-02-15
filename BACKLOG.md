@@ -7,13 +7,13 @@ Review periodically and promote items to sprint scope as needed.
 
 ## 🔒 Security
 
-- [ ] MQTT authentication (username/password) for production
-- [ ] TLS encryption for MQTT broker
+- [x] MQTT authentication (username/password) for production
+- [x] TLS encryption for MQTT broker (port 8883, self-signed CA)
 - [ ] MQTT topic ACLs (per-device access control)
 - [ ] OTA firmware digital signature verification
 - [ ] Replace `setInsecure()` with CA cert for HTTPS OTA
 - [ ] Pre-commit `detect-secrets` hook
-- [ ] `.env.example` creation + secrets hygiene
+- [x] `.env.example` creation + secrets hygiene
 
 ## 📡 OTA
 
@@ -26,24 +26,24 @@ Review periodically and promote items to sprint scope as needed.
 ## 🏗️ Infrastructure / DevOps
 
 - [ ] CI: `yamllint`, `jsonlint`, compose config validation
-- [ ] Reverse proxy (Caddy/Traefik) + TLS + domain
-- [ ] Docker healthchecks + `depends_on: service_healthy`
+- [x] Reverse proxy (Caddy) + automatic TLS + domain
+- [x] Docker healthchecks + `depends_on: service_healthy`
 - [ ] Makefile shim (`make up`, `make logs`, `make psql`)
 
 ## 🧪 Testing / QA
 
 - [ ] E2E test: spin stack → publish MQTT → verify Postgres row
-- [ ] Unit tests for collector (payload → DB row)
+- [x] Unit tests for collector (topic parsing + payload validation)
 - [ ] Load test (`mosquitto_pub` loop, 1–5 k msgs/min)
-- [ ] MQTT payload validation in collector (reject malformed)
+- [x] MQTT payload validation in collector (reject malformed)
 
 ## 🗄️ Data / Storage
 
-- [ ] Nightly `pg_dump` backups (named volume + optional S3)
+- [x] Daily `pg_dump` backups (7-day retention, named volume)
 - [ ] Schema migrations (Flyway/Atlas) with CI drift check
 - [ ] Retention policy: prune raw measurements after 30–90 days
 - [ ] Rollup / aggregation jobs
-- [ ] Device registry (device_id metadata table)
+- [x] Device registry (devices table, auto-populated from edge status)
 - [ ] Dead-letter queue for unparseable messages
 
 ## 🔥 Hydronic Heater
