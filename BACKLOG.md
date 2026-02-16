@@ -14,6 +14,8 @@ Review periodically and promote items to sprint scope as needed.
 - [ ] Replace `setInsecure()` with CA cert for HTTPS OTA
 - [ ] Pre-commit `detect-secrets` hook
 - [x] `.env.example` creation + secrets hygiene
+- [x] Grafana multi-user (admin + viewer accounts)
+- [ ] Caddy security headers + rate limiting
 
 ## 📡 OTA
 
