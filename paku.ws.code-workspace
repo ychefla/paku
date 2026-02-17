@@ -17,12 +17,20 @@
         "name": "hydronic-heater"
       },
       {
+        "path": "./paku-ha",
+        "name": "paku-ha (home assistant)"
+      },
+      {
         "path": ".",
         "name": "paku (root)"
       }
     ],
     "settings": {
-      "json.validate.enable": false
+      "json.validate.enable": false,
+      "chat.tools.terminal.autoApprove": {
+        "git remote": true,
+        "gh": true
+      }
       // put shared workspace settings here (optional)
     }
   }
