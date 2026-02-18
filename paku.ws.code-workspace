@@ -29,7 +29,11 @@
       "json.validate.enable": false,
       "chat.tools.terminal.autoApprove": {
         "git remote": true,
-        "gh": true
+        "gh": true,
+        "git fetch": true,
+        "git pull": true,
+        "git merge": true,
+        "git commit": true
       }
       // put shared workspace settings here (optional)
     }
