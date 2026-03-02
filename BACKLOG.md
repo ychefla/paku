@@ -48,11 +48,11 @@ Review periodically and promote items to sprint scope as needed.
 - [x] Expression indexes on `ecoflow_measurements` for JSONB temp fields (interim)
 
 ### EcoFlow schema cleanup (Vaihe 2)
-- [ ] **Poista `raw_data` JSONB-sarake** `ecoflow_measurements`-taulusta
+- [x] **Poista `raw_data` JSONB-sarake** `ecoflow_measurements`-taulusta
   - Collector kirjoittaa enää vain purettuihin sarakkeisiin
   - Grafana-kyselyt eivät tarvitse enää `raw_data->>'...'` -syntaksia
-  - Taulun koko putoaa ~783 MB → ~20 MB
-  - Muista: kaikki EcoFlow Grafana-dashboardit päivitettävä samalla
+  - Taulun koko putosi 983 MB → 81 MB (~902 MB vapautettu)
+  - Backup: `/home/paku/backups/ecoflow_backup_pre_raw_data_drop.dump`
 
 ### EcoFlow config-taulu eriyttäminen (Vaihe 2b, optional)
 - [ ] Jaa `ecoflow_measurements` kahteen tauluun:
