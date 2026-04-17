@@ -1,3 +1,5 @@
 paku-core/
 paku-iot/
-hydronic-heater/
+hydronic-heater/paku-ha/
+.DS_Store
+*.MOV

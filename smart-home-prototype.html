@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 800x480 Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg-base: #121212;
+            --bg-panel: #1e1e1e;
+            --bg-card: #2c2c2c;
+            --bg-card-hover: #383838;
+            --bg-active: #2a2a2a;
+            --text-main: #ffffff;
+            --text-secondary: #aaaaaa;
+            --accent: #ff9800;
+            --accent-active: #e68900;
+            --accent-blue: #03a9f4;
+            --accent-green: #4caf50;
+            --danger: #f44336;
+            --border: #444444;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-family); user-select: none; }
+        body { background-color: #000; display: flex; justify-content: center; align-items: center; height: 100vh; color: var(--text-main); }
+        
+        .screen { width: 800px; height: 480px; background-color: var(--bg-base); position: relative; display: flex; flex-direction: column; overflow: hidden; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border: 1px solid var(--border); }
+        
+        /* Header */
+        .sys-header { height: 40px; background-color: var(--bg-panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 var(--spacing-md); font-size: 14px; z-index: 10; }
+        .header-left, .header-center, .header-right { display: flex; align-items: center; gap: var(--spacing-md); }
+        .header-center { gap: 20px; }
+        .text-green { color: var(--accent-green); }
+        .text-orange { color: var(--accent); }
+        .text-red { color: var(--danger); }
+        .clock { font-size: 16px; font-weight: bold; }
+        .heater-status { display: flex; align-items: center; gap: 4px; font-weight: 600; }
+        .heater-status.on { color: var(--accent); }
+        .heater-status.off { color: var(--text-secondary); }
+        .heater-status.error { color: var(--danger); }
+        .screen-off-btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; cursor: pointer; transition: 0.2s; }
+        .screen-off-btn:hover { background: var(--bg-active); border-color: var(--accent); }
+
+        /* Main Layout */
+        .main-layout { display: flex; flex: 1; height: calc(480px - 40px); }
+        
+        /* Sidebar */
+        .nav-sidebar { width: 100px; background-color: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--spacing-sm); color: var(--text-secondary); cursor: pointer; border-bottom: 1px solid var(--border); transition: background-color 0.2s, color 0.2s; position: relative; }
+        .nav-item:last-child { border-bottom: none; }
+        .nav-item i { font-size: 24px; }
+        .nav-item span { font-size: 12px; font-weight: 500; }
+        .nav-item.active { color: var(--accent); background-color: rgba(255, 152, 0, 0.1); }
+        .nav-item.active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background-color: var(--accent); }
+
+        /* Content Area */
+        .content-area { flex: 1; position: relative; overflow: hidden; background-color: var(--bg-base); padding: var(--spacing-md); }
+        .tab-panel { display: none; width: 100%; height: 100%; flex-direction: column; animation: fadeIn 0.3s ease-out; overflow-y: auto; overflow-x: hidden; }
+        .tab-panel.active { display: flex; }
+        
+        /* Custom scrollbar styling */
+        .tab-panel::-webkit-scrollbar { width: 8px; }
+        .tab-panel::-webkit-scrollbar-track { background: var(--bg-base); border-radius: 4px; }
+        .tab-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+        .tab-panel::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Component Styles */
+        .card { background-color: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); padding: var(--spacing-md); display: flex; flex-direction: column; }
+        .card-header { font-size: 18px; font-weight: 600; margin-bottom: var(--spacing-md); display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Main Tab (Presets Grid) */
+        #tab-main { padding: 0; /* Let grid take all space */ }
+        .preset-sections { display: flex; gap: var(--spacing-lg); height: 100%; }
+        .preset-section { flex: 1; display: flex; flex-direction: column; }
+        .section-header { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: var(--spacing-md); padding: 8px; background-color: var(--bg-panel); border-radius: 6px; border: 1px solid var(--border); }
+        .section-header.lights { color: var(--accent-blue); }
+        .section-header.climate { color: var(--accent); }
+        .preset-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: var(--spacing-md); flex: 1; }
+        .preset-btn { background-color: var(--bg-card); border: 2px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: 0.1s; text-align: center; }
+        .preset-btn:active { transform: scale(0.98); background-color: var(--bg-active); border-color: var(--accent); }
+        .preset-btn.active { border-color: var(--accent); background-color: rgba(255, 152, 0, 0.15); box-shadow: inset 0 0 20px rgba(255, 152, 0, 0.1); }
+        .preset-btn i { font-size: 48px; margin-bottom: 16px; color: var(--accent-blue); }
+        .preset-btn.active i { color: var(--accent); }
+        .preset-btn span { font-size: 24px; font-weight: bold; font-family: var(--font-family); }
+
+        /* General layout for other tabs */
+        .tab-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md); height: 40px; flex-shrink: 0; }
+        .tab-title { font-size: 24px; font-weight: bold; }
+        .save-preset-btn { background-color: var(--bg-panel); color: #fff; border: 1px solid var(--accent); border-radius: 6px; padding: 8px 16px; font-size: 16px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-weight: 600; }
+        .save-preset-btn:active { background-color: var(--accent); color: #000; }
+
+        /* Climate Tab Layout */
+        .climate-container { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-md); height: 100%; }
+        
+        /* Climate - Fan Controls */
+        .toggle-group { display: flex; gap: 12px; margin-bottom: 20px; }
+        .toggle-btn { flex: 1; padding: 16px 0; background-color: var(--bg-panel); border: 2px solid var(--border); border-radius: 8px; text-align: center; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .toggle-btn.t-active { background-color: var(--accent-blue); border-color: var(--accent-blue); color: #000; }
+        
+        /* Slider wrapper */
+        .slider-wrapper { margin-top: auto; padding-top: 20px; }
+        .slider-label { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 16px; font-weight: bold; }
+        input[type="range"] { -webkit-appearance: none; width: 100%; height: 24px; background: var(--bg-panel); border-radius: 12px; outline: none; border: 1px solid var(--border); overflow: hidden; margin-top: 8px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%; background: #fff; cursor: pointer; box-shadow: -100vw 0 0 100vw var(--accent); }
+        .slider-blue::-webkit-slider-thumb { box-shadow: -100vw 0 0 100vw var(--accent-blue) !important; }
+        .slider-orange::-webkit-slider-thumb { box-shadow: -100vw 0 0 100vw var(--accent) !important; }
+        
+        /* Climate - Heater Controls */
+        .heater-main { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+        .big-power-btn { width: 80px; height: 80px; border-radius: 50%; background-color: var(--bg-panel); border: 3px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 32px; color: var(--text-secondary); cursor: pointer; transition: 0.2s; }
+        .big-power-btn.on { border-color: var(--danger); color: var(--danger); box-shadow: 0 0 15px rgba(244, 67, 54, 0.4); }
+        .temp-target-display { text-align: right; }
+        .temp-val { font-size: 56px; font-weight: bold; display: flex; align-items: flex-start; justify-content: flex-end; line-height: 1; }
+        .temp-val span { font-size: 24px; margin-top: 8px; color: var(--text-secondary); }
+        .temp-control-row { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+        .temp-btn { flex: 0 0 60px; height: 60px; background-color: var(--bg-panel); border: 1px solid var(--border); border-radius: 12px; font-size: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .temp-btn:active { background-color: var(--bg-active); }
+        .temp-slider-wrap { flex: 1; }
+
+        /* Lights Tab Layout */
+        .lights-container { display: flex; flex-direction: column; gap: var(--spacing-md); height: 100%; }
+        
+        /* Master Controls */
+        .master-controls { background-color: var(--bg-panel); border: 2px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .master-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+        .master-header i { font-size: 20px; color: var(--accent); }
+        .master-header span { font-size: 18px; font-weight: bold; color: var(--text-primary); }
+        .master-power-row { display: flex; gap: 12px; margin-bottom: 16px; }
+        .master-power-btn { flex: 1; padding: 14px; border: 2px solid var(--border); border-radius: 8px; background-color: var(--bg-card); color: var(--text-primary); font-size: 14px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .master-power-btn.active { background-color: var(--accent); border-color: var(--accent); color: #000; }
+        
+        /* Individual Zone Controls */
+        .zones-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .zone-card { background-color: var(--bg-panel); border: 2px solid var(--border); border-radius: 12px; padding: 16px; transition: 0.2s; }
+        .zone-card.zone-on { border-color: #4caf50; }
+        .zone-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .zone-info { display: flex; align-items: center; gap: 8px; }
+        .zone-info i { font-size: 16px; color: var(--accent); }
+        .zone-info span { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .zone-toggle { width: 50px; height: 24px; border-radius: 12px; border: 2px solid var(--border); background-color: var(--bg-card); cursor: pointer; position: relative; transition: 0.3s; }
+        .zone-toggle.on { background-color: #4caf50; border-color: #4caf50; }
+        .zone-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background-color: #fff; transition: 0.3s; }
+        .zone-toggle.on::after { transform: translateX(24px); }
+        .zone-mini-slider { width: 100%; height: 6px; margin: 8px 0 4px 0; }
+        .zone-value { font-size: 11px; color: var(--text-secondary); text-align: center; }
+
+        /* Sensors Tab Layout */
+        /* Sensors Tab Layout */
+        .sensors-container { display: flex; flex-direction: column; gap: var(--spacing-md); min-height: 100%; }
+        .big-graph-card { flex: 1; background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; min-height: 180px; }
+        .graph-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .graph-title { font-size: 16px; font-weight: bold; }
+        .graph-legend { display: flex; gap: 12px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .graph-svg-wrapper { flex: 1; position: relative; width: 100%; height: 100%; }
+        .graph-svg-wrapper svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; }
+
+        /* Battery Tab Layout */
+        .battery-container { display: flex; flex-direction: column; gap: var(--spacing-md); min-height: 100%; }
+        .batt-graph-card { flex: 1; background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; min-height: 160px; }
+        .batt-graph-left { flex: 1; display: flex; flex-direction: column; }
+        .batt-values-right { width: 180px; margin-left: var(--spacing-md); display: flex; flex-direction: column; justify-content: center; gap: 16px; }
+        .value-item { text-align: center; padding: 12px; background-color: var(--bg-panel); border-radius: 6px; border: 1px solid var(--border); }
+        .value-label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .value-number { font-size: 28px; font-weight: bold; }
+        .value-unit { font-size: 14px; color: var(--text-secondary); }
+
+        /* Modal / Overlay */
+        .modal-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.8); z-index: 100; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); opacity: 0; transition: opacity 0.2s; }
+        .modal-overlay.show { display: flex; opacity: 1; }
+        .modal-box { width: 400px; background-color: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; transform: scale(0.95); transition: transform 0.2s; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+        .modal-overlay.show .modal-box { transform: scale(1); }
+        .modal-header { padding: 16px; background-color: var(--bg-panel); border-bottom: 1px solid var(--border); font-size: 20px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .close-btn { background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; }
+        .modal-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+        .preset-save-btn { width: 100%; padding: 14px; background-color: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; color: #fff; font-size: 16px; font-weight: bold; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .preset-save-btn:active { background-color: var(--accent); color: #000; border-color: var(--accent); }
+        .preset-save-btn i { font-size: 20px; }
+
+        /* Settings Tab Layout */
+        .settings-container { display: flex; flex-direction: column; gap: 16px; min-height: 100%; }
+        .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid var(--border); }
+        .setting-row:last-child { border-bottom: none; }
+        .setting-label { display: flex; align-items: center; gap: 12px; font-size: 16px; color: var(--text-primary); }
+        .setting-label i { color: var(--accent); font-size: 18px; width: 20px; text-align: center; }
+        .setting-control { display: flex; align-items: center; gap: 12px; }
+        .setting-control input[type="range"] { width: 120px; }
+        .setting-control span { min-width: 40px; font-size: 14px; color: var(--text-secondary); }
+        .setting-select { background-color: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); padding: 8px 12px; font-size: 14px; }
+        .setting-status { display: flex; align-items: center; gap: 12px; }
+        .status-connected { color: var(--accent-green); font-size: 14px; font-weight: 600; }
+        .fw-version { color: var(--text-secondary); font-size: 14px; font-family: monospace; }
+        .setting-btn { background-color: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); padding: 8px 16px; font-size: 14px; cursor: pointer; transition: 0.2s; }
+        .setting-btn:hover { border-color: var(--accent); }
+        .setting-btn.danger { border-color: var(--danger); color: var(--danger); }
+        .setting-btn.danger:hover { background-color: var(--danger); color: #fff; }
+        .setting-actions { display: flex; gap: 8px; }
+
+    </style>
+</head>
+<body>
+
+<div class="screen">
+    <!-- Header -->
+    <div class="sys-header">
+        <div class="header-left">
+            <span class="text-green"><i class="fa-solid fa-wifi"></i> 100%</span>
+            <span class="text-green"><i class="fa-solid fa-network-wired"></i> MQTT</span>
+            <span class="text-green"><i class="fa-solid fa-bluetooth"></i> BLE</span>
+            <div class="heater-status on"><i class="fa-solid fa-fire"></i> ON</div>
+        </div>
+        <div class="header-center">
+            <span><i class="fa-solid fa-sun"></i> OUT: -2°C / 82%</span>
+            <span><i class="fa-solid fa-home"></i> IN: 22.4°C / 45%</span>
+            <span><i class="fa-solid fa-snowflake"></i> FRIDGE: -18.5°C</span>
+        </div>
+        <div class="header-right">
+            <span><i class="fa-solid fa-battery-three-quarters"></i> 87%</span>
+            <div class="screen-off-btn" onclick="screenOff()"><i class="fa-solid fa-power-off"></i></div>
+            <div class="clock" id="clock">12:34</div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-layout">
+        <!-- Sidebar Navigation -->
+        <div class="nav-sidebar">
+            <div class="nav-item active" onclick="switchTab('tab-main', this)">
+                <i class="fa-solid fa-house"></i>
+            </div>
+            <div class="nav-item" onclick="switchTab('tab-climate', this)">
+                <i class="fa-solid fa-temperature-arrow-up"></i>
+            </div>
+            <div class="nav-item" onclick="switchTab('tab-lights', this)">
+                <i class="fa-solid fa-lightbulb"></i>
+            </div>
+            <div class="nav-item" onclick="switchTab('tab-sensors', this)">
+                <i class="fa-solid fa-chart-line"></i>
+            </div>
+            <div class="nav-item" onclick="switchTab('tab-battery', this)">
+                <i class="fa-solid fa-bolt"></i>
+            </div>
+            <div class="nav-item" onclick="switchTab('tab-settings', this)">
+                <i class="fa-solid fa-gear"></i>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="content-area">
+            
+            <!-- ====== MAIN TAB (PRESETS GRID) ====== -->
+            <div id="tab-main" class="tab-panel active">
+                <div class="preset-sections">
+                    <!-- Lights Section -->
+                    <div class="preset-section">
+                        <div class="section-header lights"><i class="fa-solid fa-lightbulb"></i> Lighting Presets</div>
+                        <div class="preset-grid">
+                            <div class="preset-btn" onclick="toggleMainPreset(this)">
+                                <i class="fa-solid fa-power-off"></i>
+                                <span>All Off</span>
+                            </div>
+                            <div class="preset-btn active" onclick="toggleMainPreset(this)">
+                                <i class="fa-solid fa-sun"></i>
+                                <span>All On</span>
+                            </div>
+                            <div class="preset-btn" onclick="toggleMainPreset(this)">
+                                <i class="fa-solid fa-kitchen-set"></i>
+                                <span>Kitchen Only</span>
+                            </div>
+                            <div class="preset-btn" onclick="toggleMainPreset(this)">
+                                <i class="fa-solid fa-bed"></i>
+                                <span>Night Light</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Climate Section -->
+                    <div class="preset-section">
+                        <div class="section-header climate"><i class="fa-solid fa-temperature-arrow-up"></i> Climate Presets</div>
+                        <div class="preset-grid">
+                            <div class="preset-btn" onclick="toggleMainPreset(this)">
+                                <i class="fa-solid fa-power-off"></i>
+                                <span>All Off</span>
+                            </div>
+                            <div class="preset-btn" onclick="toggleMainPreset(this)">
+                                <i class="fa-solid fa-fire"></i>
+                                <span>Heat</span>
+                            </div>
+                            <div class="preset-btn" onclick="toggleMainPreset(this)">
+                                <i class="fa-solid fa-fan"></i>
+                                <span>Max Out Flow</span>
+                            </div>
+                            <div class="preset-btn" onclick="toggleMainPreset(this)">
+                                <i class="fa-solid fa-moon"></i>
+                                <span>Night Setting</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== CLIMATE TAB ====== -->
+            <div id="tab-climate" class="tab-panel">
+                <div class="tab-header">
+                    <button class="save-preset-btn" onclick="openModal('climate')" style="margin-left: auto;"><i class="fa-solid fa-floppy-disk"></i> Save to Preset</button>
+                </div>
+                <div class="climate-container">
+                    <!-- Fan Card -->
+                    <div class="card">
+                        <div class="card-header">Roof Fan (MaxxFan)</div>
+                        
+                        <div class="toggle-group">
+                            <div class="toggle-btn t-active" onclick="toggleBtn(this, 'In', 'Out')">Air In</div>
+                            <div class="toggle-btn" onclick="toggleBtn(this, 'Out', 'In')">Air Out</div>
+                        </div>
+                        <div class="toggle-group">
+                            <div class="toggle-btn" onclick="toggleDualBtn(this)">Lid Open</div>
+                        </div>
+
+                        <div class="slider-wrapper">
+                            <div class="slider-label">
+                                <span>Fan Speed</span>
+                                <span id="fan-speed-val">40%</span>
+                            </div>
+                            <input type="range" class="slider-blue" min="0" max="100" value="40" oninput="document.getElementById('fan-speed-val').innerText = this.value + '%'">
+                        </div>
+                    </div>
+
+                    <!-- Heater Card -->
+                    <div class="card">
+                        <div class="card-header">Diesel Heater</div>
+                        <div class="heater-main">
+                            <div class="big-power-btn" id="heater-pwr" onclick="this.classList.toggle('on')">
+                                <i class="fa-solid fa-power-off"></i>
+                            </div>
+                            <div class="temp-target-display">
+                                <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 4px;">Target Temp</div>
+                                <div class="temp-val" id="heater-target">21<span>°C</span></div>
+                            </div>
+                        </div>
+
+                        <div class="temp-control-row">
+                            <div class="temp-btn" onclick="adjTemp(-1)">-</div>
+                            <div class="temp-slider-wrap">
+                                <input type="range" class="slider-orange" min="10" max="30" value="21" oninput="updateTemp(this.value)" id="heater-slider">
+                            </div>
+                            <div class="temp-btn" onclick="adjTemp(1)">+</div>
+                        </div>
+
+                        <div class="toggle-group" style="margin-bottom:0; margin-top: auto;">
+                            <div class="toggle-btn" style="border-color: var(--danger); color: var(--danger);" onclick="this.classList.toggle('t-active'); if(this.classList.contains('t-active')){this.style.backgroundColor='var(--danger)'; this.style.color='#fff'}else{this.style.backgroundColor='var(--bg-panel)'; this.style.color='var(--danger)'}">
+                                <i class="fa-solid fa-fire"></i> Full Power Override
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== LIGHTS TAB ====== -->
+            <div id="tab-lights" class="tab-panel">
+                <div class="tab-header">
+                    <button class="save-preset-btn" onclick="openModal('lights')" style="margin-left: auto;"><i class="fa-solid fa-floppy-disk"></i> Save to Preset</button>
+                </div>
+                
+                <div class="lights-container">
+                    <!-- Master Controls -->
+                    <div class="master-controls">
+                        <div class="master-header">
+                            <i class="fa-solid fa-sliders"></i>
+                            <span>Master Controls</span>
+                        </div>
+                        
+                        <div class="master-power-row">
+                            <button class="master-power-btn active" id="all-on-btn" onclick="setAllZones(true)">ALL ON</button>
+                            <button class="master-power-btn" id="all-off-btn" onclick="setAllZones(false)">ALL OFF</button>
+                        </div>
+                        
+                        <div class="l-slider-row">
+                            <div class="slider-label">
+                                <span><i class="fa-solid fa-brightness"></i> Master Brightness</span>
+                                <span id="master-bri-val">75%</span>
+                            </div>
+                            <input type="range" class="slider-orange" min="0" max="100" value="75" id="master-brightness" oninput="updateMasterBrightness(this.value)">
+                        </div>
+                        
+                        <div class="l-slider-row">
+                            <div class="slider-label">
+                                <span><i class="fa-solid fa-palette"></i> Master Color Temp</span>
+                                <span id="master-ct-val">4000K</span>
+                            </div>
+                            <input type="range" class="ct-slider" min="2700" max="6500" value="4000" id="master-colortemp" oninput="updateMasterColorTemp(this.value)">
+                        </div>
+                    </div>
+
+                    <!-- Individual Zone Controls -->
+                    <div class="zones-grid">
+                        <!-- Living Area -->
+                        <div class="zone-card zone-on" data-zone="living">
+                            <div class="zone-header">
+                                <div class="zone-info">
+                                    <i class="fa-solid fa-couch"></i>
+                                    <span>Living Area</span>
+                                </div>
+                                <div class="zone-toggle on" onclick="toggleZone('living', this)"></div>
+                            </div>
+                            <input type="range" class="zone-mini-slider slider-orange" min="0" max="100" value="80" oninput="updateIndividualBrightness('living', this.value)">
+                            <div class="zone-value">Brightness: <span id="living-bri">80%</span></div>
+                            <input type="range" class="zone-mini-slider ct-slider" min="2700" max="6500" value="4000" oninput="updateIndividualColorTemp('living', this.value)">
+                            <div class="zone-value">Color: <span id="living-ct">4000K</span></div>
+                        </div>
+                        
+                        <!-- Kitchen -->
+                        <div class="zone-card zone-on" data-zone="kitchen">
+                            <div class="zone-header">
+                                <div class="zone-info">
+                                    <i class="fa-solid fa-kitchen-set"></i>
+                                    <span>Kitchen</span>
+                                </div>
+                                <div class="zone-toggle on" onclick="toggleZone('kitchen', this)"></div>
+                            </div>
+                            <input type="range" class="zone-mini-slider slider-orange" min="0" max="100" value="65" oninput="updateIndividualBrightness('kitchen', this.value)">
+                            <div class="zone-value">Brightness: <span id="kitchen-bri">65%</span></div>
+                            <input type="range" class="zone-mini-slider ct-slider" min="2700" max="6500" value="3500" oninput="updateIndividualColorTemp('kitchen', this.value)">
+                            <div class="zone-value">Color: <span id="kitchen-ct">3500K</span></div>
+                        </div>
+                        
+                        <!-- Bedroom -->
+                        <div class="zone-card" data-zone="bedroom">
+                            <div class="zone-header">
+                                <div class="zone-info">
+                                    <i class="fa-solid fa-bed"></i>
+                                    <span>Bedroom</span>
+                                </div>
+                                <div class="zone-toggle" onclick="toggleZone('bedroom', this)"></div>
+                            </div>
+                            <input type="range" class="zone-mini-slider slider-orange" min="0" max="100" value="40" oninput="updateIndividualBrightness('bedroom', this.value)">
+                            <div class="zone-value">Brightness: <span id="bedroom-bri">40%</span></div>
+                            <input type="range" class="zone-mini-slider ct-slider" min="2700" max="6500" value="2700" oninput="updateIndividualColorTemp('bedroom', this.value)">
+                            <div class="zone-value">Color: <span id="bedroom-ct">2700K</span></div>
+                        </div>
+                        
+                        <!-- Outside -->
+                        <div class="zone-card" data-zone="outside">
+                            <div class="zone-header">
+                                <div class="zone-info">
+                                    <i class="fa-solid fa-sun"></i>
+                                    <span>Outside</span>
+                                </div>
+                                <div class="zone-toggle" onclick="toggleZone('outside', this)"></div>
+                            </div>
+                            <input type="range" class="zone-mini-slider slider-orange" min="0" max="100" value="100" oninput="updateIndividualBrightness('outside', this.value)">
+                            <div class="zone-value">Brightness: <span id="outside-bri">100%</span></div>
+                            <input type="range" class="zone-mini-slider ct-slider" min="2700" max="6500" value="5000" oninput="updateIndividualColorTemp('outside', this.value)">
+                            <div class="zone-value">Color: <span id="outside-ct">5000K</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ====== SENSORS TAB ====== -->
+            <div id="tab-sensors" class="tab-panel">
+                <div class="sensors-container">
+                    
+                    <!-- Graph 1: Temperatures -->
+                    <div class="big-graph-card">
+                        <div class="graph-header">
+                            <div class="graph-title">Temperatures (°C)</div>
+                            <div class="graph-legend">
+                                <div class="legend-item"><div class="dot" style="background:#ff5252"></div> Indoor (22.4°)</div>
+                                <div class="legend-item"><div class="dot" style="background:#448aff"></div> Outdoor (8.1°)</div>
+                                <div class="legend-item"><div class="dot" style="background:#69f0ae"></div> Fridge (4.5°)</div>
+                                <div class="legend-item"><div class="dot" style="background:#ffd740"></div> Reppu (15.2°)</div>
+                            </div>
+                        </div>
+                        <div class="graph-svg-wrapper">
+                            <svg preserveAspectRatio="none" viewBox="0 0 1000 100">
+                                <!-- Grid Lines -->
+                                <line x1="0" y1="20" x2="1000" y2="20" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+                                <line x1="0" y1="50" x2="1000" y2="50" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+                                <line x1="0" y1="80" x2="1000" y2="80" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+                                <!-- Lines -->
+                                <polyline fill="none" stroke="#ff5252" stroke-width="3" points="0,40 100,42 200,45 300,50 400,60 500,40 600,30 700,28 800,25 900,24 1000,22"/>
+                                <polyline fill="none" stroke="#448aff" stroke-width="2" points="0,85 100,85 200,88 300,90 400,92 500,85 600,75 700,65 800,70 900,80 1000,81"/>
+                                <polyline fill="none" stroke="#69f0ae" stroke-width="2" points="0,95 200,92 400,94 600,96 800,93 1000,95"/>
+                                <polyline fill="none" stroke="#ffd740" stroke-width="2" points="0,60 200,65 400,70 600,50 800,40 1000,38"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- Graph 2: Humidities -->
+                    <div class="big-graph-card">
+                        <div class="graph-header">
+                            <div class="graph-title">Humidity (%)</div>
+                            <div class="graph-legend">
+                                <div class="legend-item"><div class="dot" style="background:#00e5ff"></div> Indoor (45%)</div>
+                                <div class="legend-item"><div class="dot" style="background:#b388ff"></div> Outdoor (82%)</div>
+                                <div class="legend-item"><div class="dot" style="background:#ff8a80"></div> Reppu (55%)</div>
+                            </div>
+                        </div>
+                        <div class="graph-svg-wrapper">
+                            <svg preserveAspectRatio="none" viewBox="0 0 1000 100">
+                                <!-- Grid Lines -->
+                                <line x1="0" y1="20" x2="1000" y2="20" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+                                <line x1="0" y1="50" x2="1000" y2="50" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+                                <line x1="0" y1="80" x2="1000" y2="80" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+                                <!-- Lines -->
+                                <polyline fill="none" stroke="#00e5ff" stroke-width="3" points="0,55 100,53 200,50 300,48 400,45 500,45 600,48 700,50 800,47 900,45 1000,45"/>
+                                <polyline fill="none" stroke="#b388ff" stroke-width="2" points="0,20 100,18 200,25 300,22 400,15 500,10 600,12 700,18 800,15 900,18 1000,20"/>
+                                <polyline fill="none" stroke="#ff8a80" stroke-width="2" points="0,40 200,45 400,50 600,55 800,60 1000,62"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ====== BATTERY TAB ====== -->
+            <div id="tab-battery" class="tab-panel">
+                <div class="battery-container">
+                    
+                    <!-- Inputs Graph -->
+                    <div class="batt-graph-card">
+                        <div class="batt-graph-left">
+                            <div class="graph-header">
+                                <div class="graph-title">Inputs (W)</div>
+                                <div class="graph-legend">
+                                    <div class="legend-item"><div class="dot" style="background:#ffa000"></div> Solar</div>
+                                    <div class="legend-item"><div class="dot" style="background:#4caf50"></div> AC Charger</div>
+                                </div>
+                            </div>
+                            <div class="graph-svg-wrapper">
+                                <svg preserveAspectRatio="none" viewBox="0 0 1000 100">
+                                    <!-- Grid Lines -->
+                                    <line x1="0" y1="20" x2="1000" y2="20" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+                                    <line x1="0" y1="50" x2="1000" y2="50" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+                                    <line x1="0" y1="80" x2="1000" y2="80" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+                                    <!-- Stacked Area: AC Charger Base, Solar Top -->
+                                    <polygon fill="rgba(76, 175, 80, 0.3)" stroke="#4caf50" stroke-width="2" points="0,100 0,90 200,90 400,90 500,40 600,40 800,90 1000,90 1000,100"/>
+                                    <polygon fill="rgba(255, 160, 0, 0.4)" stroke="#ffa000" stroke-width="2" points="0,90 200,90 300,70 400,30 500,20 600,25 700,40 800,90 1000,90 0,90"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="batt-values-right">
+                            <div class="value-item">
+                                <div class="value-label"><div class="dot" style="background:#ffa000"></div> Solar Power</div>
+                                <div class="value-number" style="color: #ffa000">120<span class="value-unit">W</span></div>
+                            </div>
+                            <div class="value-item">
+                                <div class="value-label"><div class="dot" style="background:#4caf50"></div> AC Charge</div>
+                                <div class="value-number" style="color: #4caf50">0<span class="value-unit">W</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Outputs Graph -->
+                    <div class="batt-graph-card">
+                        <div class="batt-graph-left">
+                            <div class="graph-header">
+                                <div class="graph-title">Outputs (W)</div>
+                                <div class="graph-legend">
+                                    <div class="legend-item"><div class="dot" style="background:#f44336"></div> AC Inverter</div>
+                                    <div class="legend-item"><div class="dot" style="background:#03a9f4"></div> 12V DC Base</div>
+                                </div>
+                            </div>
+                            <div class="graph-svg-wrapper">
+                                <svg preserveAspectRatio="none" viewBox="0 0 1000 100">
+                                    <!-- Grid Lines -->
+                                    <line x1="0" y1="20" x2="1000" y2="20" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+                                    <line x1="0" y1="50" x2="1000" y2="50" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+                                    <line x1="0" y1="80" x2="1000" y2="80" stroke="#444" stroke-width="1" stroke-dasharray="4,4"/>
+                                    <!-- Stacked Area: DC Base, AC Top -->
+                                    <polygon fill="rgba(3, 169, 244, 0.3)" stroke="#03a9f4" stroke-width="2" points="0,100 0,70 200,75 400,70 600,65 800,70 1000,70 1000,100"/>
+                                    <polygon fill="rgba(244, 67, 54, 0.4)" stroke="#f44336" stroke-width="2" points="0,70 200,75 300,30 400,25 500,70 600,65 800,70 1000,70 0,70"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="batt-values-right">
+                            <div class="value-item">
+                                <div class="value-label"><div class="dot" style="background:#f44336"></div> AC Inverter</div>
+                                <div class="value-number" style="color: #f44336">0<span class="value-unit">W</span></div>
+                            </div>
+                            <div class="value-item">
+                                <div class="value-label"><div class="dot" style="background:#03a9f4"></div> 12V DC Load</div>
+                                <div class="value-number" style="color: #03a9f4">45<span class="value-unit">W</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ====== SETTINGS TAB ====== -->
+            <div id="tab-settings" class="tab-panel">
+                <div class="settings-container">
+                    <div class="card">
+                        <div class="card-header">Display Settings</div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-display"></i>
+                                <span>Display Brightness</span>
+                            </div>
+                            <div class="setting-control">
+                                <input type="range" class="slider-orange" min="10" max="100" value="80" oninput="document.getElementById('brightness-val').innerText = this.value + '%'">
+                                <span id="brightness-val">80%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-moon"></i>
+                                <span>Sleep Timer</span>
+                            </div>
+                            <div class="setting-control">
+                                <select class="setting-select">
+                                    <option value="0">Never</option>
+                                    <option value="30">30 seconds</option>
+                                    <option value="60" selected>1 minute</option>
+                                    <option value="300">5 minutes</option>
+                                    <option value="600">10 minutes</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-palette"></i>
+                                <span>Theme</span>
+                            </div>
+                            <div class="setting-control">
+                                <select class="setting-select">
+                                    <option value="dark" selected>Dark</option>
+                                    <option value="light">Light</option>
+                                    <option value="auto">Auto</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">Network Settings</div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-wifi"></i>
+                                <span>WiFi Status</span>
+                            </div>
+                            <div class="setting-status">
+                                <span class="status-connected">Connected to JosPar_2.4G</span>
+                                <button class="setting-btn">Configure</button>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-signal"></i>
+                                <span>Signal Strength</span>
+                            </div>
+                            <div class="setting-status">
+                                <span class="status-connected">-45 dBm (Excellent)</span>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-server"></i>
+                                <span>MQTT Broker</span>
+                            </div>
+                            <div class="setting-status">
+                                <span class="status-connected">Connected</span>
+                                <button class="setting-btn">Settings</button>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-network-wired"></i>
+                                <span>IP Address</span>
+                            </div>
+                            <div class="setting-status">
+                                <span class="fw-version">192.168.1.145</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">Device Information</div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-microchip"></i>
+                                <span>Firmware Version</span>
+                            </div>
+                            <div class="setting-status">
+                                <span class="fw-version">v2.1.0</span>
+                                <button class="setting-btn">Check Updates</button>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-memory"></i>
+                                <span>Free Memory</span>
+                            </div>
+                            <div class="setting-status">
+                                <span class="fw-version">245KB / 512KB</span>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-clock"></i>
+                                <span>Uptime</span>
+                            </div>
+                            <div class="setting-status">
+                                <span class="fw-version">2d 14h 32m</span>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-thermometer"></i>
+                                <span>CPU Temperature</span>
+                            </div>
+                            <div class="setting-status">
+                                <span class="fw-version">52°C</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">System Actions</div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-download"></i>
+                                <span>Export Logs</span>
+                            </div>
+                            <div class="setting-actions">
+                                <button class="setting-btn" onclick="alert('Logs exported to SD card')">Export</button>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-broom"></i>
+                                <span>Clear Cache</span>
+                            </div>
+                            <div class="setting-actions">
+                                <button class="setting-btn" onclick="confirm('Clear cache?') && alert('Cache cleared')">Clear</button>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-row">
+                            <div class="setting-label">
+                                <i class="fa-solid fa-power-off"></i>
+                                <span>System Control</span>
+                            </div>
+                            <div class="setting-actions">
+                                <button class="setting-btn danger" onclick="confirm('Restart system?') && alert('System restarting...')">Restart</button>
+                                <button class="setting-btn danger" onclick="confirm('Factory reset?') && alert('Resetting to defaults...')">Factory Reset</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Save Preset Modal -->
+<div class="modal-overlay" id="preset-modal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span id="modal-title">Save Preset</span>
+            <button class="close-btn" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" id="modal-preset-list">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+</div>
+
+<script>
+    // Tab Switching Logic
+    function switchTab(tabId, navItem) {
+        document.querySelectorAll('.tab-panel').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        
+        document.getElementById(tabId).classList.add('active');
+        navItem.classList.add('active');
+    }
+
+    // Main Preset Grid Logic
+    function toggleMainPreset(btn) {
+        document.querySelectorAll('.preset-btn').forEach(el => el.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    // Screen Off Function  
+    function screenOff() {
+        if (confirm('Turn off screen?')) {
+            document.querySelector('.screen').style.display = 'none';
+            // In real implementation, this would trigger ESP32 screen off
+            setTimeout(() => {
+                document.querySelector('.screen').style.display = 'flex';
+                alert('Screen turned back on (simulated)');
+            }, 3000);
+        }
+    }
+
+    // Toggle Buttons (Dual Option)
+    function toggleBtn(clickedBtn, allowStr, disallowStr) {
+        let parent = clickedBtn.parentElement;
+        Array.from(parent.children).forEach(c => c.classList.remove('t-active'));
+        clickedBtn.classList.add('t-active');
+    }
+
+    // Single Toggle Boolean Button
+    function toggleDualBtn(btn) {
+        btn.classList.toggle('t-active');
+        if (btn.classList.contains('t-active')) {
+            btn.innerHTML = 'Lid Closed';
+        } else {
+            btn.innerHTML = 'Lid Open';
+        }
+    }
+
+    // Heater Temp Control
+    function updateTemp(val) {
+        document.getElementById('heater-target').innerHTML = val + '<span>°C</span>';
+        document.getElementById('heater-slider').value = val;
+    }
+    function adjTemp(delta) {
+        let slider = document.getElementById('heater-slider');
+        let newVal = parseInt(slider.value) + delta;
+        if(newVal >= slider.min && newVal <= slider.max) {
+            updateTemp(newVal);
+        }
+    }
+
+    // Clock
+    function updateClock() {
+        const now = new Date();
+        const chars = t => t.toString().padStart(2, '0');
+        document.getElementById('clock').innerText = `${chars(now.getHours())}:${chars(now.getMinutes())}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Lighting Control System
+    const zoneSettings = {
+        'living': { power: true, brightness: 80, colortemp: 4000 },
+        'kitchen': { power: true, brightness: 65, colortemp: 3500 },
+        'bedroom': { power: false, brightness: 40, colortemp: 2700 },
+        'outside': { power: false, brightness: 100, colortemp: 5000 }
+    };
+
+    // Master Control Functions
+    function setAllZones(powerState) {
+        Object.keys(zoneSettings).forEach(zone => {
+            zoneSettings[zone].power = powerState;
+            const toggle = document.querySelector(`[data-zone="${zone}"] .zone-toggle`);
+            const card = document.querySelector(`[data-zone="${zone}"]`);
+            
+            if (powerState) {
+                toggle.classList.add('on');
+                card.classList.add('zone-on');
+            } else {
+                toggle.classList.remove('on');
+                card.classList.remove('zone-on');
+            }
+        });
+        
+        // Update master buttons
+        document.getElementById('all-on-btn').className = powerState ? 'master-power-btn active' : 'master-power-btn';
+        document.getElementById('all-off-btn').className = !powerState ? 'master-power-btn active' : 'master-power-btn';
+    }
+
+    function updateMasterBrightness(value) {
+        document.getElementById('master-bri-val').textContent = value + '%';
+        // Apply to all zones
+        Object.keys(zoneSettings).forEach(zone => {
+            zoneSettings[zone].brightness = parseInt(value);
+            const slider = document.querySelector(`[data-zone="${zone}"] .slider-orange`);
+            const display = document.getElementById(`${zone}-bri`);
+            if (slider) slider.value = value;
+            if (display) display.textContent = value + '%';
+        });
+    }
+
+    function updateMasterColorTemp(value) {
+        document.getElementById('master-ct-val').textContent = value + 'K';
+        // Apply to all zones
+        Object.keys(zoneSettings).forEach(zone => {
+            zoneSettings[zone].colortemp = parseInt(value);
+            const slider = document.querySelector(`[data-zone="${zone}"] .ct-slider`);
+            const display = document.getElementById(`${zone}-ct`);
+            if (slider) slider.value = value;
+            if (display) display.textContent = value + 'K';
+        });
+    }
+
+    // Individual Zone Functions
+    function toggleZone(zone, toggleElement) {
+        const settings = zoneSettings[zone];
+        settings.power = !settings.power;
+        
+        const card = document.querySelector(`[data-zone="${zone}"]`);
+        
+        if (settings.power) {
+            toggleElement.classList.add('on');
+            card.classList.add('zone-on');
+        } else {
+            toggleElement.classList.remove('on');
+            card.classList.remove('zone-on');
+        }
+        
+        // Update master buttons based on all zones
+        const allOn = Object.values(zoneSettings).every(z => z.power);
+        const allOff = Object.values(zoneSettings).every(z => !z.power);
+        document.getElementById('all-on-btn').className = allOn ? 'master-power-btn active' : 'master-power-btn';
+        document.getElementById('all-off-btn').className = allOff ? 'master-power-btn active' : 'master-power-btn';
+    }
+
+    function updateIndividualBrightness(zone, value) {
+        zoneSettings[zone].brightness = parseInt(value);
+        document.getElementById(`${zone}-bri`).textContent = value + '%';
+    }
+
+    function updateIndividualColorTemp(zone, value) {
+        zoneSettings[zone].colortemp = parseInt(value);
+        document.getElementById(`${zone}-ct`).textContent = value + 'K';
+    }
+
+    // Modal Logic
+    const presetConfig = {
+        'climate': [
+            { id: 1, name: 'All Off', icon: 'fa-power-off' },
+            { id: 2, name: 'Heat', icon: 'fa-fire' },
+            { id: 3, name: 'Max Out Flow', icon: 'fa-fan' },
+            { id: 4, name: 'Night Setting', icon: 'fa-moon' }
+        ],
+        'lights': [
+            { id: 1, name: 'All Off', icon: 'fa-power-off' },
+            { id: 2, name: 'All On', icon: 'fa-lightbulb' },
+            { id: 3, name: 'Kitchen Only', icon: 'fa-kitchen-set' },
+            { id: 4, name: 'Night Light', icon: 'fa-moon' }
+        ]
+    };
+
+    function openModal(type) {
+        const modal = document.getElementById('preset-modal');
+        const listContainer = document.getElementById('modal-preset-list');
+        const title = document.getElementById('modal-title');
+        
+        title.innerText = type === 'climate' ? 'Save Climate Preset' : 'Save Lighting Preset';
+        listContainer.innerHTML = '';
+        
+        presetConfig[type].forEach(p => {
+            const btn = document.createElement('button');
+            btn.className = 'preset-save-btn';
+            btn.innerHTML = `<span>Save as: ${p.name}</span> <i class="fa-solid ${p.icon}"></i>`;
+            btn.onclick = () => {
+                alert(`Saved to: ${p.name}`); // Mock action
+                closeModal();
+            };
+            listContainer.appendChild(btn);
+        });
+
+        modal.classList.add('show');
+    }
+
+    function closeModal() {
+        document.getElementById('preset-modal').classList.remove('show');
+    }
+</script>
+
+</body>
+</html>

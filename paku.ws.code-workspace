@@ -13,6 +13,10 @@
         "name": "paku-core (firmware)"
       },
       {
+        "path": "./paku-core/tools/frezzer-emulator",
+        "name": "frezzer-emulator"
+      },
+      {
         "path": "./hydronic-heater",
         "name": "hydronic-heater"
       },
@@ -25,6 +29,26 @@
         "name": "paku (root)"
       }
     ],
+    "tasks": {
+      "version": "2.0.0",
+      "tasks": [
+        {
+          "label": "sync: pull dashboard from HA",
+          "type": "shell",
+          "command": "while true; do python3 '${workspaceFolder:paku-ha (home assistant)}/deploy_dashboard.py' --auto; sleep 300; done",
+          "isBackground": true,
+          "problemMatcher": [],
+          "presentation": {
+            "reveal": "silent",
+            "panel": "dedicated",
+            "showReuseMessage": false
+          },
+          "runOptions": {
+            "runOn": "folderOpen"
+          }
+        }
+      ]
+    },
     "settings": {
       "json.validate.enable": false,
       "chat.tools.terminal.autoApprove": {
